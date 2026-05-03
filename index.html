@@ -78,7 +78,48 @@
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
-<pre>Set-MpPreference -DisableRealtimeMonitoring $false</pre>
+<pre><#
+.SYNOPSIS
+    Remediates STIG WN11-CC-000305 - Disable indexing of encrypted files
+
+.DESCRIPTION
+    Disables Windows Search indexing of encrypted files by setting the
+    appropriate Group Policy registry value.
+
+.NOTES
+    Run as Administrator
+#>
+
+Write-Host "Applying STIG WN11-CC-000305 remediation..." -ForegroundColor Cyan
+
+# Registry path for Windows Search policy
+$Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search"
+
+# Create key if it doesn't exist
+if (-not (Test-Path $Path)) {
+    New-Item -Path $Path -Force | Out-Null
+}
+
+# Disable indexing of encrypted files
+New-ItemProperty -Path $Path `
+    -Name "AllowIndexingEncryptedStoresOrItems" `
+    -PropertyType DWord `
+    -Value 0 `
+    -Force | Out-Null
+
+# Restart Windows Search service to apply change
+Write-Host "Restarting Windows Search service..." -ForegroundColor Yellow
+Restart-Service -Name "WSearch" -Force -ErrorAction SilentlyContinue
+
+# Validation
+$result = Get-ItemProperty -Path $Path -Name "AllowIndexingEncryptedStoresOrItems" -ErrorAction SilentlyContinue
+
+if ($result.AllowIndexingEncryptedStoresOrItems -eq 0) {
+    Write-Host "STIG WN11-CC-000305 successfully remediated." -ForegroundColor Green
+} else {
+    Write-Host "STIG remediation FAILED." -ForegroundColor Red
+}
+</pre>
 </div>
 
 <p>Ensures endpoint protection is always active to prevent malware execution.</p>
@@ -91,7 +132,58 @@
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
-<pre>auditpol /set /subcategory:"Logon" /success:enable /failure:enable</pre>
+<pre><#
+.SYNOPSIS
+    Remediates STIG WN11-CC-000252 - Disable Windows Game Recording and Broadcasting
+
+.DESCRIPTION
+    Disables Xbox Game Bar background recording and game DVR features.
+    Required for Windows 11 STIG compliance.
+
+.NOTES
+    Run as Administrator
+#>
+
+Write-Host "Applying STIG WN11-CC-000252 remediation..." -ForegroundColor Cyan
+
+# Registry path for Game DVR / recording features
+$Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR"
+
+# Create key if it doesn't exist
+if (-not (Test-Path $Path)) {
+    New-Item -Path $Path -Force | Out-Null
+}
+
+# Disable Game DVR (recording/broadcasting)
+New-ItemProperty -Path $Path `
+    -Name "AllowGameDVR" `
+    -PropertyType DWord `
+    -Value 0 `
+    -Force | Out-Null
+
+# ALSO disable Xbox Game Bar background capture (user context policy)
+$UserPath = "HKCU:\System\GameConfigStore"
+
+if (-not (Test-Path $UserPath)) {
+    New-Item -Path $UserPath -Force | Out-Null
+}
+
+New-ItemProperty -Path $UserPath `
+    -Name "GameDVR_Enabled" `
+    -PropertyType DWord `
+    -Value 0 `
+    -Force | Out-Null
+
+# Validation
+$check1 = Get-ItemProperty -Path $Path -Name "AllowGameDVR" -ErrorAction SilentlyContinue
+$check2 = Get-ItemProperty -Path $UserPath -Name "GameDVR_Enabled" -ErrorAction SilentlyContinue
+
+if ($check1.AllowGameDVR -eq 0 -and $check2.GameDVR_Enabled -eq 0) {
+    Write-Host "STIG WN11-CC-000252 successfully remediated." -ForegroundColor Green
+} else {
+    Write-Host "STIG remediation FAILED or incomplete." -ForegroundColor Red
+}
+</pre>
 </div>
 
 <p>Enables tracking of successful and failed logon attempts.</p>
@@ -105,8 +197,178 @@
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
 <pre>
-net accounts /minpwlen:14
-net accounts /complexity:enabled
+<#
+.SYNOPSIS
+    Remediates STIG WN11-CC-000326 - Turn off Microsoft consumer experiences.
+
+.DESCRIPTION
+    STIG ID   : WN11-CC-000326
+    Severity  : CAT II (Medium)
+    CCI       : CCI-001812
+    Rule ID   : SV-253385r958651_rule
+    Vuln ID   : V-253385
+
+    Finding:
+        Microsoft consumer experiences provide suggestions, advertisements,
+        and content such as app recommendations and tips from Microsoft.
+        In enterprise environments, this behavior is not appropriate and may
+        expose users to unnecessary or untrusted content.
+
+    Required setting:
+        Policy  : Turn off Microsoft consumer experiences
+        Value   : Enabled (this disables consumer experiences)
+        Registry: HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent
+                  DisableWindowsConsumerFeatures = 1 (DWORD)
+
+    Group Policy equivalent:
+        Computer Configuration >> Administrative Templates >>
+        Windows Components >> Cloud Content >>
+        "Turn off Microsoft consumer experiences" = Enabled
+
+.NOTES
+    - Must be run as Administrator (elevated PowerShell).
+    - This setting is enforced via registry (policy-backed).
+    - On domain-joined systems, domain GPO may override this setting.
+    - No reboot required, but a gpupdate/logoff may be needed.
+
+.EXAMPLE
+    .\Remediate-WN11-CC-000326.ps1
+#>
+
+#Requires -RunAsAdministrator
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+$StigId      = 'WN11-CC-000326'
+$RegPath     = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent'
+$ValueName   = 'DisableWindowsConsumerFeatures'
+$RequiredVal = 1
+
+# ── Helper: write a timestamped, coloured status line ─────────────────────────
+function Write-Status {
+    param(
+        [string]$Message,
+        [ValidateSet('Info','Pass','Fail','Action','Warn')]
+        [string]$Level = 'Info'
+    )
+    $colour = switch ($Level) {
+        'Pass'   { 'Green'  }
+        'Fail'   { 'Red'    }
+        'Action' { 'Cyan'   }
+        'Warn'   { 'Yellow' }
+        default  { 'White'  }
+    }
+    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
+}
+
+# ── Helper: get current registry value ────────────────────────────────────────
+function Get-PolicyValue {
+    if (Test-Path $RegPath) {
+        try {
+            return (Get-ItemProperty -Path $RegPath -Name $ValueName -ErrorAction Stop).$ValueName
+        }
+        catch {
+            return $null
+        }
+    }
+    return $null
+}
+
+# ── Helper: set registry value ────────────────────────────────────────────────
+function Set-PolicyValue {
+    Write-Status "Applying registry setting..." Action
+
+    if (-not (Test-Path $RegPath)) {
+        Write-Status "Registry path does not exist. Creating..." Action
+        New-Item -Path $RegPath -Force | Out-Null
+    }
+
+    New-ItemProperty -Path $RegPath -Name $ValueName -Value $RequiredVal -PropertyType DWord -Force | Out-Null
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+Write-Status "Starting remediation for $StigId" Info
+Write-Status "Control: Turn off Microsoft consumer experiences must be Enabled" Info
+Write-Host   ""
+
+# ── Pre-check ─────────────────────────────────────────────────────────────────
+Write-Status "PRE-CHECK" Info
+
+$currentValue = Get-PolicyValue
+
+if ($null -eq $currentValue) {
+    Write-Status "Registry value not set -- FINDING" Fail
+}
+elseif ($currentValue -ne $RequiredVal) {
+    Write-Status "Registry value = $currentValue (expected $RequiredVal) -- FINDING" Fail
+}
+else {
+    Write-Status "Registry value = $currentValue -- ALREADY COMPLIANT" Pass
+    Write-Host ""
+    Write-Status "No changes required. Exiting." Info
+    exit 0
+}
+
+Write-Host ""
+
+# ── Remediation ───────────────────────────────────────────────────────────────
+Write-Status "REMEDIATION" Action
+
+try {
+    Set-PolicyValue
+    Write-Status "Registry successfully updated." Action
+}
+catch {
+    Write-Status "Failed to set registry value: $_" Fail
+    exit 1
+}
+
+Write-Host ""
+
+# ── Post-check / Verification ─────────────────────────────────────────────────
+Write-Status "POST-CHECK / VERIFICATION" Info
+
+Start-Sleep -Seconds 2
+
+$verifyValue = Get-PolicyValue
+
+if ($verifyValue -eq $RequiredVal) {
+    Write-Status "VERIFICATION PASSED: Registry value = $verifyValue -- COMPLIANT" Pass
+}
+else {
+    Write-Status "VERIFICATION FAILED: Registry value = $verifyValue (expected $RequiredVal)" Fail
+    exit 1
+}
+
+Write-Host ""
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Status "Remediation Summary" Info
+Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
+Write-Host   "  Setting   : Turn off Microsoft consumer experiences" -ForegroundColor White
+Write-Host   "  Value Set : Enabled (DisableWindowsConsumerFeatures = 1)" -ForegroundColor White
+Write-Host   "  Method    : Registry (Policy-based)" -ForegroundColor White
+Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host ""
+
+Write-Status "NOTE: On domain-joined systems, verify domain GPO enforces this setting." Warn
+Write-Status "      Local changes may be overridden at next policy refresh." Warn
+Write-Host   "      Location: Computer Configuration >> Administrative Templates >>" -ForegroundColor Yellow
+Write-Host   "      Windows Components >> Cloud Content >>" -ForegroundColor Yellow
+Write-Host   "      'Turn off Microsoft consumer experiences' = Enabled" -ForegroundColor Yellow
+Write-Host ""
+
+Write-Status "You can also verify with:" Warn
+Write-Host   "      Get-ItemProperty -Path '$RegPath' -Name '$ValueName'" -ForegroundColor Yellow
+Write-Host ""
+
+Write-Status "Remediation complete." Pass
+
 </pre>
 </div>
 
