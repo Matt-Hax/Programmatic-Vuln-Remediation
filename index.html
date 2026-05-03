@@ -75,7 +75,7 @@
 <!-- ===================== STIG 1 ===================== -->
 <div class="stig">
 <h2>STIG WN11-CC-000305</h2>
-<p>Enforces Windows Defender real-time protection.</p>
+<p>Indexing of encrypted files must be turned off.</p>
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
@@ -123,13 +123,13 @@ if ($result.AllowIndexingEncryptedStoresOrItems -eq 0) {
 </pre>
 </div>
 
-<p>Ensures endpoint protection is always active to prevent malware execution.</p>
+<p>Indexing of encrypted files may expose sensitive data. This setting prevents encrypted files from being indexed.</p>
 </div>
 
 <!-- ===================== STIG 2 ===================== -->
 <div class="stig">
 <h2>STIG WN11-CC-000252</h2>
-<p>Configures logon auditing.</p>
+<p>Windows 11 must be configured to disable Windows Game Recording and Broadcasting.</p>
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
@@ -187,398 +187,269 @@ if ($check1.AllowGameDVR -eq 0 -and $check2.GameDVR_Enabled -eq 0) {
 </pre>
 </div>
 
-<p>Enables tracking of successful and failed logon attempts.</p>
+<p>Windows Game Recording and Broadcasting is intended for use with games; however, it could potentially record screen shots of other applications and expose sensitive data. Disabling the feature will prevent this from occurring</p>
 </div>
 
 <!-- ===================== STIG 3 ===================== -->
 <div class="stig">
 <h2>STIG WN11-CC-000326</h2>
-<p>Password policy enforcement.</p>
+<p>PowerShell script block logging must be enabled on Windows 11.</p>
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
 <pre>
 <#
 .SYNOPSIS
-    Remediates STIG WN11-CC-000326 - Turn off Microsoft consumer experiences.
+    Remediates STIG WN11-CC-000326 - Enable PowerShell Script Block Logging
 
 .DESCRIPTION
-    STIG ID   : WN11-CC-000326
-    Severity  : CAT II (Medium)
-    CCI       : CCI-001812
-    Rule ID   : SV-253385r958651_rule
-    Vuln ID   : V-253385
-
-    Finding:
-        Microsoft consumer experiences provide suggestions, advertisements,
-        and content such as app recommendations and tips from Microsoft.
-        In enterprise environments, this behavior is not appropriate and may
-        expose users to unnecessary or untrusted content.
-
-    Required setting:
-        Policy  : Turn off Microsoft consumer experiences
-        Value   : Enabled (this disables consumer experiences)
-        Registry: HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent
-                  DisableWindowsConsumerFeatures = 1 (DWORD)
-
-    Group Policy equivalent:
-        Computer Configuration >> Administrative Templates >>
-        Windows Components >> Cloud Content >>
-        "Turn off Microsoft consumer experiences" = Enabled
+    Enables PowerShell Script Block Logging to ensure full visibility
+    of executed PowerShell commands for auditing and security monitoring.
 
 .NOTES
-    - Must be run as Administrator (elevated PowerShell).
-    - This setting is enforced via registry (policy-backed).
-    - On domain-joined systems, domain GPO may override this setting.
-    - No reboot required, but a gpupdate/logoff may be needed.
-
-.EXAMPLE
-    .\Remediate-WN11-CC-000326.ps1
+    Run as Administrator
 #>
 
-#Requires -RunAsAdministrator
+Write-Host "Applying STIG WN11-CC-000326 remediation..." -ForegroundColor Cyan
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
+# Registry path for PowerShell Script Block Logging
+$Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging"
 
-# ── Configuration ─────────────────────────────────────────────────────────────
-$StigId      = 'WN11-CC-000326'
-$RegPath     = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent'
-$ValueName   = 'DisableWindowsConsumerFeatures'
-$RequiredVal = 1
-
-# ── Helper: write a timestamped, coloured status line ─────────────────────────
-function Write-Status {
-    param(
-        [string]$Message,
-        [ValidateSet('Info','Pass','Fail','Action','Warn')]
-        [string]$Level = 'Info'
-    )
-    $colour = switch ($Level) {
-        'Pass'   { 'Green'  }
-        'Fail'   { 'Red'    }
-        'Action' { 'Cyan'   }
-        'Warn'   { 'Yellow' }
-        default  { 'White'  }
-    }
-    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
+# Create key if it doesn't exist
+if (-not (Test-Path $Path)) {
+    New-Item -Path $Path -Force | Out-Null
 }
 
-# ── Helper: get current registry value ────────────────────────────────────────
-function Get-PolicyValue {
-    if (Test-Path $RegPath) {
-        try {
-            return (Get-ItemProperty -Path $RegPath -Name $ValueName -ErrorAction Stop).$ValueName
-        }
-        catch {
-            return $null
-        }
-    }
-    return $null
+# Enable Script Block Logging
+New-ItemProperty -Path $Path `
+    -Name "EnableScriptBlockLogging" `
+    -PropertyType DWord `
+    -Value 1 `
+    -Force | Out-Null
+
+# Optional but recommended: enable module logging as well (good for SIEM correlation)
+$ModulePath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging"
+if (-not (Test-Path $ModulePath)) {
+    New-Item -Path $ModulePath -Force | Out-Null
 }
 
-# ── Helper: set registry value ────────────────────────────────────────────────
-function Set-PolicyValue {
-    Write-Status "Applying registry setting..." Action
+New-ItemProperty -Path $ModulePath `
+    -Name "EnableModuleLogging" `
+    -PropertyType DWord `
+    -Value 1 `
+    -Force | Out-Null
 
-    if (-not (Test-Path $RegPath)) {
-        Write-Status "Registry path does not exist. Creating..." Action
-        New-Item -Path $RegPath -Force | Out-Null
-    }
-
-    New-ItemProperty -Path $RegPath -Name $ValueName -Value $RequiredVal -PropertyType DWord -Force | Out-Null
+# Ensure module logging includes all modules
+$ModuleSettingsPath = "$ModulePath\ModuleNames"
+if (-not (Test-Path $ModuleSettingsPath)) {
+    New-Item -Path $ModuleSettingsPath -Force | Out-Null
 }
 
-# ── Main ──────────────────────────────────────────────────────────────────────
-Write-Status "Starting remediation for $StigId" Info
-Write-Status "Control: Turn off Microsoft consumer experiences must be Enabled" Info
-Write-Host   ""
+New-ItemProperty -Path $ModuleSettingsPath `
+    -Name "*" `
+    -PropertyType String `
+    -Value "*" `
+    -Force | Out-Null
 
-# ── Pre-check ─────────────────────────────────────────────────────────────────
-Write-Status "PRE-CHECK" Info
+# Validation
+$check = Get-ItemProperty -Path $Path -Name "EnableScriptBlockLogging" -ErrorAction SilentlyContinue
 
-$currentValue = Get-PolicyValue
-
-if ($null -eq $currentValue) {
-    Write-Status "Registry value not set -- FINDING" Fail
+if ($check.EnableScriptBlockLogging -eq 1) {
+    Write-Host "STIG WN11-CC-000326 successfully remediated." -ForegroundColor Green
+} else {
+    Write-Host "STIG remediation FAILED." -ForegroundColor Red
 }
-elseif ($currentValue -ne $RequiredVal) {
-    Write-Status "Registry value = $currentValue (expected $RequiredVal) -- FINDING" Fail
-}
-else {
-    Write-Status "Registry value = $currentValue -- ALREADY COMPLIANT" Pass
-    Write-Host ""
-    Write-Status "No changes required. Exiting." Info
-    exit 0
-}
-
-Write-Host ""
-
-# ── Remediation ───────────────────────────────────────────────────────────────
-Write-Status "REMEDIATION" Action
-
-try {
-    Set-PolicyValue
-    Write-Status "Registry successfully updated." Action
-}
-catch {
-    Write-Status "Failed to set registry value: $_" Fail
-    exit 1
-}
-
-Write-Host ""
-
-# ── Post-check / Verification ─────────────────────────────────────────────────
-Write-Status "POST-CHECK / VERIFICATION" Info
-
-Start-Sleep -Seconds 2
-
-$verifyValue = Get-PolicyValue
-
-if ($verifyValue -eq $RequiredVal) {
-    Write-Status "VERIFICATION PASSED: Registry value = $verifyValue -- COMPLIANT" Pass
-}
-else {
-    Write-Status "VERIFICATION FAILED: Registry value = $verifyValue (expected $RequiredVal)" Fail
-    exit 1
-}
-
-Write-Host ""
-
-# ── Summary ───────────────────────────────────────────────────────────────────
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Status "Remediation Summary" Info
-Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
-Write-Host   "  Setting   : Turn off Microsoft consumer experiences" -ForegroundColor White
-Write-Host   "  Value Set : Enabled (DisableWindowsConsumerFeatures = 1)" -ForegroundColor White
-Write-Host   "  Method    : Registry (Policy-based)" -ForegroundColor White
-Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Host ""
-
-Write-Status "NOTE: On domain-joined systems, verify domain GPO enforces this setting." Warn
-Write-Status "      Local changes may be overridden at next policy refresh." Warn
-Write-Host   "      Location: Computer Configuration >> Administrative Templates >>" -ForegroundColor Yellow
-Write-Host   "      Windows Components >> Cloud Content >>" -ForegroundColor Yellow
-Write-Host   "      'Turn off Microsoft consumer experiences' = Enabled" -ForegroundColor Yellow
-Write-Host ""
-
-Write-Status "You can also verify with:" Warn
-Write-Host   "      Get-ItemProperty -Path '$RegPath' -Name '$ValueName'" -ForegroundColor Yellow
-Write-Host ""
-
-Write-Status "Remediation complete." Pass
 
 </pre>
 </div>
 
-<p>Strengthens authentication security against brute-force attacks.</p>
+<p>Maintaining an audit trail of system activity logs can help identify configuration errors, troubleshoot service disruptions, and analyze compromises that have occurred, as well as detect attacks. Audit logs are necessary to provide a trail of evidence in case the system or network is compromised. Collecting this data is essential for analyzing the security of information assets and detecting signs of suspicious and unexpected behavior.
+
+Enabling PowerShell script block logging will record detailed information from the processing of PowerShell commands and scripts. This can provide additional detail when malware has run on a system.</p>
 </div>
 
 <!-- ===================== STIG 4 ===================== -->
 <div class="stig">
-<h2>STIG WN11-CC-000160</h2>
+<h2>STIG WN11-00-000160</h2>
 <p>Disables SMBv1 protocol.</p>
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
 <pre><#
 .SYNOPSIS
-    Remediates STIG WN11-00-000160 - The Windows 11 system must be configured
-    to require a password on wakeup from sleep.
+    Remediates STIG WN11-00-000160 by disabling SMBv1 on Windows 11 systems.
 
 .DESCRIPTION
-    STIG ID   : WN11-00-000160
-    Severity  : CAT II (Medium)
-    CCI       : CCI-000056
-    Rule ID   : SV-253269r958301_rule
-    Vuln ID   : V-253269
-
-    Finding:
-        If the system does not require a password when resuming from sleep,
-        an unauthorized user could access the system without authentication.
-        Requiring a password on wake helps protect against unauthorized access
-        when a system is left unattended.
-
-    Required setting:
-        Policy  : Require a password when a computer wakes (plugged in)
-        Value   : Enabled
-        Registry: HKLM\SOFTWARE\Policies\Microsoft\Power\PowerSettings\
-                  <GUID>\ACSettingIndex = 1
-
-        Subgroup GUID : 7516b95f-f776-4464-8c53-06167f40cc99
-        Setting GUID  : 7bc4a2f9-d8fc-4469-b07b-33eb785aaca0
-
-    Group Policy equivalent:
-        Computer Configuration >> Administrative Templates >>
-        System >> Power Management >> Sleep Settings >>
-        "Require a password when a computer wakes (plugged in)" = Enabled
+    The Server Message Block (SMB) v1 protocol is an outdated and insecure protocol.
+    This script disables SMBv1 via Windows Optional Features and registry configuration.
 
 .NOTES
-    - Must be run as Administrator.
-    - This script enforces the setting for AC power (plugged in).
-    - DC (battery) can be added if required.
-    - On domain-joined systems, GPO may override this setting.
-    - A gpupdate or reboot may be required for full enforcement.
-
-.EXAMPLE
-    .\Remediate-WN11-00-000160.ps1
+    Author: YourName
+    Date: 2026-05-03
+    STIG ID: WN11-00-000160
 #>
 
-#Requires -RunAsAdministrator
+Write-Host "Checking SMBv1 status..." -ForegroundColor Cyan
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
-
-# ── Configuration ─────────────────────────────────────────────────────────────
-$StigId = 'WN11-00-000160'
-
-$SubGroupGuid = '7516b95f-f776-4464-8c53-06167f40cc99'
-$SettingGuid  = '7bc4a2f9-d8fc-4469-b07b-33eb785aaca0'
-
-$RegPath = "HKLM:\SOFTWARE\Policies\Microsoft\Power\PowerSettings\$SubGroupGuid\$SettingGuid"
-$ValueName = 'ACSettingIndex'
-$RequiredVal = 1
-
-# ── Helper: write a timestamped, coloured status line ─────────────────────────
-function Write-Status {
-    param(
-        [string]$Message,
-        [ValidateSet('Info','Pass','Fail','Action','Warn')]
-        [string]$Level = 'Info'
-    )
-    $colour = switch ($Level) {
-        'Pass'   { 'Green'  }
-        'Fail'   { 'Red'    }
-        'Action' { 'Cyan'   }
-        'Warn'   { 'Yellow' }
-        default  { 'White'  }
-    }
-    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
+# Disable SMBv1 via Windows Optional Feature (client component)
+Try {
+    Disable-WindowsOptionalFeature -Online -FeatureName "SMB1Protocol" -NoRestart -ErrorAction Stop
+    Write-Host "SMBv1 Windows Feature disabled successfully." -ForegroundColor Green
+}
+Catch {
+    Write-Host "SMBv1 feature may already be disabled or not present." -ForegroundColor Yellow
 }
 
-# ── Helper: get current value ─────────────────────────────────────────────────
-function Get-PolicyValue {
-    if (Test-Path $RegPath) {
-        try {
-            return (Get-ItemProperty -Path $RegPath -Name $ValueName -ErrorAction Stop).$ValueName
-        }
-        catch {
-            return $null
-        }
-    }
-    return $null
+# Disable SMBv1 via registry (additional enforcement)
+$registryPath = "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters"
+
+If (!(Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
 }
 
-# ── Helper: set value ─────────────────────────────────────────────────────────
-function Set-PolicyValue {
-    Write-Status "Applying registry setting..." Action
+New-ItemProperty -Path $registryPath -Name "SMB1" -PropertyType DWORD -Value 0 -Force | Out-Null
 
-    if (-not (Test-Path $RegPath)) {
-        Write-Status "Registry path does not exist. Creating..." Action
-        New-Item -Path $RegPath -Force | Out-Null
-    }
+Write-Host "Registry settings applied to disable SMBv1." -ForegroundColor Green
 
-    New-ItemProperty -Path $RegPath -Name $ValueName -Value $RequiredVal -PropertyType DWord -Force | Out-Null
-}
+# Verify SMBv1 is disabled
+Write-Host "`nVerifying SMBv1 state..." -ForegroundColor Cyan
+Get-WindowsOptionalFeature -Online -FeatureName "SMB1Protocol"
 
-# ── Main ──────────────────────────────────────────────────────────────────────
-Write-Status "Starting remediation for $StigId" Info
-Write-Status "Control: Require a password when a computer wakes (plugged in) must be Enabled" Info
-Write-Host   ""
-
-# ── Pre-check ─────────────────────────────────────────────────────────────────
-Write-Status "PRE-CHECK" Info
-
-$currentValue = Get-PolicyValue
-
-if ($null -eq $currentValue) {
-    Write-Status "Policy not set -- FINDING" Fail
-}
-elseif ($currentValue -ne $RequiredVal) {
-    Write-Status "Current value = $currentValue (expected $RequiredVal) -- FINDING" Fail
-}
-else {
-    Write-Status "Current value = $currentValue -- ALREADY COMPLIANT" Pass
-    Write-Host ""
-    Write-Status "No changes required. Exiting." Info
-    exit 0
-}
-
-Write-Host ""
-
-# ── Remediation ───────────────────────────────────────────────────────────────
-Write-Status "REMEDIATION" Action
-
-try {
-    Set-PolicyValue
-    Write-Status "Registry successfully updated." Action
-}
-catch {
-    Write-Status "Failed to apply setting: $_" Fail
-    exit 1
-}
-
-Write-Host ""
-
-# ── Post-check / Verification ─────────────────────────────────────────────────
-Write-Status "POST-CHECK / VERIFICATION" Info
-
-Start-Sleep -Seconds 2
-
-$verifyValue = Get-PolicyValue
-
-if ($verifyValue -eq $RequiredVal) {
-    Write-Status "VERIFICATION PASSED: Setting = $verifyValue -- COMPLIANT" Pass
-}
-else {
-    Write-Status "VERIFICATION FAILED: Setting = $verifyValue (expected $RequiredVal)" Fail
-    exit 1
-}
-
-Write-Host ""
-
-# ── Summary ───────────────────────────────────────────────────────────────────
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Status "Remediation Summary" Info
-Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
-Write-Host   "  Setting   : Require password on wake (AC)" -ForegroundColor White
-Write-Host   "  Value Set : Enabled (ACSettingIndex = 1)" -ForegroundColor White
-Write-Host   "  Method    : Registry (Policy-based)" -ForegroundColor White
-Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Host ""
-
-Write-Status "NOTE: Domain GPO may override this setting." Warn
-Write-Status "      Verify in Group Policy if system is domain-joined." Warn
-Write-Host   "      Location: Computer Configuration >> Administrative Templates >> System >>" -ForegroundColor Yellow
-Write-Host   "      Power Management >> Sleep Settings >>" -ForegroundColor Yellow
-Write-Host   "      'Require a password when a computer wakes (plugged in)' = Enabled" -ForegroundColor Yellow
-Write-Host ""
-
-Write-Status "You can also verify with:" Warn
-Write-Host   "      powercfg /query SCHEME_CURRENT SUB_SLEEP CONSOLELOCK" -ForegroundColor Yellow
-Write-Host ""
-
-Write-Status "Remediation complete." Pass
+Write-Host "`nRemediation complete. A reboot may be required for full effect." -ForegroundColor Green
 </pre>
 </div>
 
-<p>Removes vulnerable legacy file-sharing protocol.</p>
+<p>SMBv1 is a legacy protocol that uses the MD5 algorithm as part of SMB. MD5 is known to be vulnerable to a number of attacks such as collision and preimage attacks as well as not being FIPS compliant.
+
+Disabling SMBv1 support may prevent access to file or print sharing resources with systems or devices that only support SMBv1. File shares and print services hosted on Windows Server 2003 are an example, however Windows Server 2003 is no longer a supported operating system. Some older Network Attached Storage (NAS) devices may only support SMBv1</p>
 </div>
 
 <!-- ===================== STIG 5 ===================== -->
 <div class="stig">
-<h2>STIG WN11-CC-000005</h2>
-<p>Enables UAC (User Account Control).</p>
+<h2>STIG WN11-CC-000315</h2>
+<p>Windows Installer must not always install with elevated privileges</p>
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
 <pre>
-Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" `
--Name "EnableLUA" -Value 1
+<#
+.SYNOPSIS
+    Remediates STIG WN11-CC-000315
+    Windows Installer must not always install with elevated privileges
+
+.DESCRIPTION
+    The Windows Installer "AlwaysInstallElevated" policy allows non-admin users
+    to install software with SYSTEM-level privileges. This is a CAT I (High)
+    finding and must be disabled in both HKLM and HKCU hives.
+
+.STIG
+    ID:       WN11-CC-000315
+    Severity: CAT I (High)
+    Fix:      Set AlwaysInstallElevated to 0 in both registry hives
+
+.NOTES
+    Must be run as Administrator
+#>
+
+# ─────────────────────────────────────────
+# Requires Administrator
+# ─────────────────────────────────────────
+If (-NOT ([Security.Principal.WindowsPrincipal] `
+    [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
+    [Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Warning "This script must be run as Administrator. Exiting."
+    Exit 1
+}
+
+# ─────────────────────────────────────────
+# Registry Paths
+# ─────────────────────────────────────────
+$HKLMPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Installer"
+$HKCUPath = "HKCU:\SOFTWARE\Policies\Microsoft\Windows\Installer"
+$ValueName = "AlwaysInstallElevated"
+$RequiredValue = 0
+
+# ─────────────────────────────────────────
+# Function: Check Current Value
+# ─────────────────────────────────────────
+Function Get-STIGStatus {
+    param ($Path, $Name)
+
+    If (Test-Path $Path) {
+        $val = Get-ItemProperty -Path $Path -Name $Name -ErrorAction SilentlyContinue
+        If ($null -ne $val.$Name) {
+            Return $val.$Name
+        }
+    }
+    Return "Not Set"
+}
+
+# ─────────────────────────────────────────
+# Check Before Remediation
+# ─────────────────────────────────────────
+Write-Host "`n[*] Checking current state before remediation..." -ForegroundColor Cyan
+
+$HKLMBefore = Get-STIGStatus -Path $HKLMPath -Name $ValueName
+$HKCUBefore = Get-STIGStatus -Path $HKCUPath -Name $ValueName
+
+Write-Host "  HKLM AlwaysInstallElevated : $HKLMBefore"
+Write-Host "  HKCU AlwaysInstallElevated : $HKCUBefore"
+
+# ─────────────────────────────────────────
+# Remediate HKLM
+# ─────────────────────────────────────────
+Write-Host "`n[*] Remediating HKLM..." -ForegroundColor Yellow
+
+Try {
+    If (-Not (Test-Path $HKLMPath)) {
+        New-Item -Path $HKLMPath -Force | Out-Null
+        Write-Host "  [+] Created registry path: $HKLMPath"
+    }
+    Set-ItemProperty -Path $HKLMPath -Name $ValueName -Value $RequiredValue -Type DWord -Force
+    Write-Host "  [+] HKLM\$ValueName set to $RequiredValue" -ForegroundColor Green
+} Catch {
+    Write-Error "  [-] Failed to remediate HKLM: $_"
+}
+
+# ─────────────────────────────────────────
+# Remediate HKCU
+# ─────────────────────────────────────────
+Write-Host "`n[*] Remediating HKCU..." -ForegroundColor Yellow
+
+Try {
+    If (-Not (Test-Path $HKCUPath)) {
+        New-Item -Path $HKCUPath -Force | Out-Null
+        Write-Host "  [+] Created registry path: $HKCUPath"
+    }
+    Set-ItemProperty -Path $HKCUPath -Name $ValueName -Value $RequiredValue -Type DWord -Force
+    Write-Host "  [+] HKCU\$ValueName set to $RequiredValue" -ForegroundColor Green
+} Catch {
+    Write-Error "  [-] Failed to remediate HKCU: $_"
+}
+
+# ─────────────────────────────────────────
+# Verify After Remediation
+# ─────────────────────────────────────────
+Write-Host "`n[*] Verifying remediation..." -ForegroundColor Cyan
+
+$HKLMAfter = Get-STIGStatus -Path $HKLMPath -Name $ValueName
+$HKCUAfter = Get-STIGStatus -Path $HKCUPath -Name $ValueName
+
+Write-Host "  HKLM AlwaysInstallElevated : $HKLMAfter"
+Write-Host "  HKCU AlwaysInstallElevated : $HKCUAfter"
+
+# ─────────────────────────────────────────
+# Pass/Fail Result
+# ─────────────────────────────────────────
+Write-Host ""
+If ($HKLMAfter -eq $RequiredValue -and $HKCUAfter -eq $RequiredValue) {
+    Write-Host "  [PASS] WN11-CC-000315 remediation successful." -ForegroundColor Green
+} Else {
+    Write-Host "  [FAIL] WN11-CC-000315 remediation may not be complete. Review values above." -ForegroundColor Red
+}
+
+Write-Host "`n[*] Done. Run 'gpupdate /force' to apply Group Policy changes.`n" -ForegroundColor Cyan
+
 </pre>
 </div>
 
