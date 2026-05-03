@@ -1113,18 +1113,73 @@ Write-Status "Remediation complete." Pass
 
 <!-- ===================== STIG 10 ===================== -->
 <div class="stig">
-<h2>STIG WN11-CC-000200</h2>
-<p>Disables AutoRun for removable media.</p>
+<h2>STIG WN11-CC-000185</h2>
+<p>The default autorun behavior must be configured to prevent autorun commands.</p>
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
 <pre>
-Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" `
--Name "NoDriveTypeAutoRun" -Value 255
+<#
+.SYNOPSIS
+    Remediates STIG WN11-CC-000185 - Prevent Autorun commands
+
+.DESCRIPTION
+    Configures the system to prevent Autorun commands from executing
+    on removable and network drives.
+
+.NOTES
+    Run as Administrator
+#>
+
+Write-Host "Applying STIG WN11-CC-000185 remediation..." -ForegroundColor Cyan
+
+# Registry path for Autoplay/Autorun policies
+$Path = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer"
+
+# Create key if missing
+if (-not (Test-Path $Path)) {
+    New-Item -Path $Path -Force | Out-Null
+}
+
+# Disable Autorun for all drive types (0xFF = 255)
+New-ItemProperty -Path $Path `
+    -Name "NoDriveTypeAutoRun" `
+    -PropertyType DWord `
+    -Value 255 `
+    -Force | Out-Null
+
+# Ensure Autorun is fully disabled
+New-ItemProperty -Path $Path `
+    -Name "NoAutorun" `
+    -PropertyType DWord `
+    -Value 1 `
+    -Force | Out-Null
+
+# (Optional but recommended) Turn off Autoplay completely
+$PolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Explorer"
+
+if (-not (Test-Path $PolicyPath)) {
+    New-Item -Path $PolicyPath -Force | Out-Null
+}
+
+New-ItemProperty -Path $PolicyPath `
+    -Name "NoAutoplayfornonVolume" `
+    -PropertyType DWord `
+    -Value 1 `
+    -Force | Out-Null
+
+# Validation
+$result = Get-ItemProperty -Path $Path -Name "NoDriveTypeAutoRun" -ErrorAction SilentlyContinue
+
+if ($result.NoDriveTypeAutoRun -eq 255) {
+    Write-Host "STIG WN11-CC-000185 successfully remediated." -ForegroundColor Green
+} else {
+    Write-Host "STIG remediation FAILED." -ForegroundColor Red
+}
 </pre>
 </div>
 
-<p>Enabling camera access from the lock screen could allow for unauthorized use. Requiring logon will ensure the device is only used by authorized personnel.</p>
+<p>Allowing autorun commands to execute may introduce malicious code to a system. Configuring this setting prevents autorun commands from executing.</p>
 </div>
 
 <!-- ===================== SCRIPT ===================== -->
