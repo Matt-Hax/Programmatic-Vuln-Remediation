@@ -756,171 +756,62 @@ Write-Status "Remediation complete." Pass
 <!-- ===================== STIG 8 ===================== -->
 <div class="stig">
 <h2>STIG WN11-CC-000280</h2>
-<p>Remote Desktop Services must require
-    Network Level Authentication (NLA)..</p>
+<p>Remote Desktop Services must always prompt a client for passwords upon connection.</p>
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
 <pre><#
 .SYNOPSIS
-    Remediates STIG WN11-CC-000280 - Remote Desktop Services must require
-    Network Level Authentication (NLA).
+    Remediates STIG WN11-CC-000280 by requiring password prompt for RDP connections.
 
 .DESCRIPTION
-    STIG ID   : WN11-CC-000280
-    Severity  : CAT II (Medium)
-    CCI       : CCI-001453
-    Rule ID   : SV-253404r877394_rule
-    Vuln ID   : V-253404
+    This setting ensures that Remote Desktop Services always prompts the user
+    for a password upon connection, preventing credential caching and reuse.
 
-    Finding:
-        Remote Desktop Services (RDS) connections that do not require Network
-        Level Authentication (NLA) are susceptible to man-in-the-middle attacks
-        because a full desktop session is established before the user is
-        authenticated. NLA forces credential verification before the session is
-        created, reducing the attack surface.
-
-    Required registry state:
-        Hive  : HKEY_LOCAL_MACHINE
-        Path  : SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services
-        Name  : UserAuthentication
-        Type  : REG_DWORD
-        Value : 1  (Enabled / NLA required)
-
-    Group Policy equivalent:
-        Computer Configuration >> Administrative Templates >>
-        Windows Components >> Remote Desktop Services >>
-        Remote Desktop Session Host >> Security >>
-        "Require user authentication for remote connections by using
-         Network Level Authentication" = Enabled
+    Configures:
+    Computer Configuration > Administrative Templates >
+    Windows Components > Remote Desktop Services >
+    Remote Desktop Session Host > Security >
+    "Always prompt for password upon connection" = Enabled
 
 .NOTES
-    - Must be run as Administrator (elevated PowerShell).
-    - On domain-joined systems, Group Policy will re-apply this setting on the
-      next gpupdate cycle. Deploy via GPO for persistent enforcement.
-    - The script performs a pre-check, applies the fix, and then verifies the
-      result. No reboot is required; the change takes effect immediately for
-      new RDP connections.
-
-.EXAMPLE
-    .\Remediate-WN11-CC-000280.ps1
+    Date: 2026-05-03
+    STIG ID: WN11-CC-000280
 #>
 
-#Requires -RunAsAdministrator
+Write-Host "Configuring RDP to always prompt for password..." -ForegroundColor Cyan
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
+# Registry path for the policy
+$regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"
 
-# ── Constants ────────────────────────────────────────────────────────────────
-$StigId      = 'WN11-CC-000280'
-$RegPath     = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services'
-$RegName     = 'UserAuthentication'
-$RegType     = 'DWord'
-$RequiredVal = 1
-
-# ── Helper: write a timestamped, coloured status line ────────────────────────
-function Write-Status {
-    param(
-        [string]$Message,
-        [ValidateSet('Info','Pass','Fail','Action','Warn')]
-        [string]$Level = 'Info'
-    )
-    $colour = switch ($Level) {
-        'Pass'   { 'Green'   }
-        'Fail'   { 'Red'     }
-        'Action' { 'Cyan'    }
-        'Warn'   { 'Yellow'  }
-        default  { 'White'   }
-    }
-    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
+# Ensure path exists
+If (!(Test-Path $regPath)) {
+    New-Item -Path $regPath -Force | Out-Null
 }
 
-# ── Helper: read the current registry value (returns $null if missing) ───────
-function Get-CurrentValue {
-    try {
-        $prop = Get-ItemProperty -Path $RegPath -Name $RegName -ErrorAction Stop
-        return $prop.$RegName
-    }
-    catch {
-        return $null
-    }
-}
+# Enable "Always prompt for password upon connection"
+New-ItemProperty -Path $regPath `
+    -Name "fPromptForPassword" `
+    -PropertyType DWord `
+    -Value 1 `
+    -Force | Out-Null
 
-# ── Main ─────────────────────────────────────────────────────────────────────
-Write-Status "Starting remediation for $StigId" Info
-Write-Status "Control: Remote Desktop Services must require Network Level Authentication (NLA)" Info
-Write-Host   ""
+Write-Host "Policy applied: Always prompt for password enabled." -ForegroundColor Green
 
-# ── Pre-check ────────────────────────────────────────────────────────────────
-Write-Status "PRE-CHECK" Info
-$currentVal = Get-CurrentValue
+# -----------------------------
+# Verification
+# -----------------------------
+Write-Host "`nVerifying configuration..." -ForegroundColor Cyan
 
-if ($null -eq $currentVal) {
-    Write-Status "Registry value '$RegName' does not exist under '$RegPath' -- FINDING" Fail
-} elseif ($currentVal -ne $RequiredVal) {
-    Write-Status "Registry value '$RegName' = $currentVal (expected $RequiredVal) -- FINDING" Fail
+$value = Get-ItemProperty -Path $regPath -Name "fPromptForPassword" -ErrorAction SilentlyContinue
+
+If ($value.fPromptForPassword -eq 1) {
+    Write-Host "Verification successful: System is compliant." -ForegroundColor Green
 } else {
-    Write-Status "Registry value '$RegName' = $currentVal -- ALREADY COMPLIANT" Pass
-    Write-Host   ""
-    Write-Status "No changes required. Exiting." Info
-    exit 0
+    Write-Host "Verification failed: Setting is not correctly applied." -ForegroundColor Red
 }
 
-Write-Host ""
-
-# ── Remediation ──────────────────────────────────────────────────────────────
-Write-Status "REMEDIATION" Action
-Write-Status "Ensuring registry key path exists: $RegPath" Action
-
-# Create the registry path if it does not exist
-if (-not (Test-Path -Path $RegPath)) {
-    New-Item -Path $RegPath -Force | Out-Null
-    Write-Status "Registry key created: $RegPath" Action
-} else {
-    Write-Status "Registry key already exists: $RegPath" Info
-}
-
-# Apply the required value
-Write-Status "Setting '$RegName' = $RequiredVal (REG_DWORD)" Action
-Set-ItemProperty -Path $RegPath -Name $RegName -Value $RequiredVal -Type $RegType -Force
-Write-Status "Registry value set successfully." Action
-
-Write-Host ""
-
-# ── Post-check / Verification ─────────────────────────────────────────────────
-Write-Status "POST-CHECK / VERIFICATION" Info
-$verifyVal = Get-CurrentValue
-
-if ($null -eq $verifyVal) {
-    Write-Status "VERIFICATION FAILED: Registry value '$RegName' not found after remediation!" Fail
-    exit 1
-} elseif ($verifyVal -ne $RequiredVal) {
-    Write-Status "VERIFICATION FAILED: '$RegName' = $verifyVal (expected $RequiredVal)" Fail
-    exit 1
-} else {
-    Write-Status "VERIFICATION PASSED: '$RegName' = $verifyVal -- COMPLIANT" Pass
-}
-
-Write-Host ""
-
-# ── Summary ──────────────────────────────────────────────────────────────────
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Status "Remediation Summary" Info
-Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
-Write-Host   "  Registry  : $RegPath\$RegName" -ForegroundColor White
-Write-Host   "  Type      : REG_DWORD" -ForegroundColor White
-Write-Host   "  Value Set : $RequiredVal (NLA Required)" -ForegroundColor White
-Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Host ""
-Write-Status "NOTE: On domain-joined systems, enforce this via Group Policy (GPO) so it" Warn
-Write-Status "      persists across policy refresh cycles:" Warn
-Write-Host   "      Computer Configuration >> Admin Templates >> Windows Components >>" -ForegroundColor Yellow
-Write-Host   "      Remote Desktop Services >> RD Session Host >> Security >>" -ForegroundColor Yellow
-Write-Host   "      'Require NLA for remote connections' = Enabled" -ForegroundColor Yellow
-Write-Host ""
-Write-Status "Remediation complete." Pass
+Write-Host "`nRemediation complete. A reboot or gpupdate may be required." -ForegroundColor Green
 </pre>
 </div>
 
