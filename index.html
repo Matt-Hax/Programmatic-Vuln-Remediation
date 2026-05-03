@@ -459,189 +459,86 @@ Write-Host "`n[*] Done. Run 'gpupdate /force' to apply Group Policy changes.`n" 
 <!-- ===================== STIG 6 ===================== -->
 <div class="stig">
 <h2>STIG WN11-CC-000345</h2>
-<p>Screen lock timeout enforcement.</p>
+<p>The Windows Remote Management (WinRM) service must not use Basic authentication.</p>
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
 <pre><#
 .SYNOPSIS
-    Remediates STIG WN11-CC-000345 - Automatic download of updates for
-    Microsoft Store apps must be disabled.
+    Remediates STIG by disabling Basic Authentication for WinRM.
 
 .DESCRIPTION
-    STIG ID   : WN11-CC-000345
-    Severity  : CAT II (Medium)
-    CCI       : CCI-001812
-    Rule ID   : SV-253404r958708_rule
-    Vuln ID   : V-253404
-
-    Finding:
-        Automatic downloading and updating of Microsoft Store apps may
-        introduce unapproved software changes into the environment.
-        Disabling this feature ensures better control over application
-        updates in managed environments.
-
-    Required setting:
-        Policy  : Turn off Automatic Download and Install of updates
-        Value   : Enabled (this disables auto-downloads)
-        Registry: HKLM\SOFTWARE\Policies\Microsoft\WindowsStore
-                  AutoDownload = 2 (DWORD)
-
-        Value meaning:
-            2 = Turn off automatic download and install of updates
-
-    Group Policy equivalent:
-        Computer Configuration >> Administrative Templates >>
-        Windows Components >> Store >>
-        "Turn off Automatic Download and Install of updates" = Enabled
+    The Windows Remote Management (WinRM) service must not use Basic authentication.
+    This script disables Basic authentication for both WinRM Service and Client
+    via registry policy settings and WinRM configuration.
 
 .NOTES
-    - Must be run as Administrator (elevated PowerShell).
-    - Policy is enforced via registry (policy-backed).
-    - On domain-joined systems, domain GPO may override this setting.
-    - No reboot required; may require gpupdate.
-
-.EXAMPLE
-    .\Remediate-WN11-CC-000345.ps1
+    Author: YourName
+    Date: 2026-05-03
 #>
 
-#Requires -RunAsAdministrator
+Write-Host "Disabling WinRM Basic Authentication..." -ForegroundColor Cyan
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
+# -----------------------------
+# Disable via Group Policy Registry (Service)
+# -----------------------------
+$serviceRegPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WinRM\Service"
 
-# ── Configuration ─────────────────────────────────────────────────────────────
-$StigId      = 'WN11-CC-000345'
-$RegPath     = 'HKLM:\SOFTWARE\Policies\Microsoft\WindowsStore'
-$ValueName   = 'AutoDownload'
-$RequiredVal = 2
-
-# ── Helper: write a timestamped, coloured status line ─────────────────────────
-function Write-Status {
-    param(
-        [string]$Message,
-        [ValidateSet('Info','Pass','Fail','Action','Warn')]
-        [string]$Level = 'Info'
-    )
-    $colour = switch ($Level) {
-        'Pass'   { 'Green'  }
-        'Fail'   { 'Red'    }
-        'Action' { 'Cyan'   }
-        'Warn'   { 'Yellow' }
-        default  { 'White'  }
-    }
-    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
+If (!(Test-Path $serviceRegPath)) {
+    New-Item -Path $serviceRegPath -Force | Out-Null
 }
 
-# ── Helper: get current value ─────────────────────────────────────────────────
-function Get-PolicyValue {
-    if (Test-Path $RegPath) {
-        try {
-            return (Get-ItemProperty -Path $RegPath -Name $ValueName -ErrorAction Stop).$ValueName
-        }
-        catch {
-            return $null
-        }
-    }
-    return $null
+New-ItemProperty -Path $serviceRegPath `
+    -Name "AllowBasic" `
+    -PropertyType DWord `
+    -Value 0 `
+    -Force | Out-Null
+
+Write-Host "WinRM Service Basic Authentication disabled via policy." -ForegroundColor Green
+
+# -----------------------------
+# Disable via Group Policy Registry (Client)
+# -----------------------------
+$clientRegPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WinRM\Client"
+
+If (!(Test-Path $clientRegPath)) {
+    New-Item -Path $clientRegPath -Force | Out-Null
 }
 
-# ── Helper: set value ─────────────────────────────────────────────────────────
-function Set-PolicyValue {
-    Write-Status "Applying registry setting..." Action
+New-ItemProperty -Path $clientRegPath `
+    -Name "AllowBasic" `
+    -PropertyType DWord `
+    -Value 0 `
+    -Force | Out-Null
 
-    if (-not (Test-Path $RegPath)) {
-        Write-Status "Registry path does not exist. Creating..." Action
-        New-Item -Path $RegPath -Force | Out-Null
-    }
+Write-Host "WinRM Client Basic Authentication disabled via policy." -ForegroundColor Green
 
-    New-ItemProperty -Path $RegPath -Name $ValueName -Value $RequiredVal -PropertyType DWord -Force | Out-Null
+# -----------------------------
+# Disable via WinRM configuration layer
+# -----------------------------
+Try {
+    winrm set winrm/config/service/auth "@{Basic=`"false`"}" | Out-Null
+    winrm set winrm/config/client/auth "@{Basic=`"false`"}" | Out-Null
+    Write-Host "WinRM service and client auth updated successfully." -ForegroundColor Green
+}
+Catch {
+    Write-Host "WinRM configuration update failed or already enforced by policy." -ForegroundColor Yellow
 }
 
-# ── Main ──────────────────────────────────────────────────────────────────────
-Write-Status "Starting remediation for $StigId" Info
-Write-Status "Control: Disable automatic download/install of Microsoft Store app updates" Info
-Write-Host   ""
+# -----------------------------
+# Verification
+# -----------------------------
+Write-Host "`nCurrent WinRM Service Auth Settings:" -ForegroundColor Cyan
+winrm get winrm/config/service/auth
 
-# ── Pre-check ─────────────────────────────────────────────────────────────────
-Write-Status "PRE-CHECK" Info
+Write-Host "`nCurrent WinRM Client Auth Settings:" -ForegroundColor Cyan
+winrm get winrm/config/client/auth
 
-$currentValue = Get-PolicyValue
-
-if ($null -eq $currentValue) {
-    Write-Status "Registry value not set -- FINDING" Fail
-}
-elseif ($currentValue -ne $RequiredVal) {
-    Write-Status "Registry value = $currentValue (expected $RequiredVal) -- FINDING" Fail
-}
-else {
-    Write-Status "Registry value = $currentValue -- ALREADY COMPLIANT" Pass
-    Write-Host ""
-    Write-Status "No changes required. Exiting." Info
-    exit 0
-}
-
-Write-Host ""
-
-# ── Remediation ───────────────────────────────────────────────────────────────
-Write-Status "REMEDIATION" Action
-
-try {
-    Set-PolicyValue
-    Write-Status "Registry successfully updated." Action
-}
-catch {
-    Write-Status "Failed to apply registry setting: $_" Fail
-    exit 1
-}
-
-Write-Host ""
-
-# ── Post-check / Verification ─────────────────────────────────────────────────
-Write-Status "POST-CHECK / VERIFICATION" Info
-
-Start-Sleep -Seconds 2
-
-$verifyValue = Get-PolicyValue
-
-if ($verifyValue -eq $RequiredVal) {
-    Write-Status "VERIFICATION PASSED: Registry value = $verifyValue -- COMPLIANT" Pass
-}
-else {
-    Write-Status "VERIFICATION FAILED: Registry value = $verifyValue (expected $RequiredVal)" Fail
-    exit 1
-}
-
-Write-Host ""
-
-# ── Summary ───────────────────────────────────────────────────────────────────
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Status "Remediation Summary" Info
-Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
-Write-Host   "  Setting   : Microsoft Store auto-update behavior" -ForegroundColor White
-Write-Host   "  Value Set : Disabled (AutoDownload = 2)" -ForegroundColor White
-Write-Host   "  Method    : Registry (Policy-based)" -ForegroundColor White
-Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Host ""
-
-Write-Status "NOTE: Domain GPO may override this setting." Warn
-Write-Status "      Verify in Group Policy if system is domain-joined." Warn
-Write-Host   "      Location: Computer Configuration >> Administrative Templates >>" -ForegroundColor Yellow
-Write-Host   "      Windows Components >> Store >>" -ForegroundColor Yellow
-Write-Host   "      'Turn off Automatic Download and Install of updates' = Enabled" -ForegroundColor Yellow
-Write-Host ""
-
-Write-Status "You can also verify with:" Warn
-Write-Host   "      Get-ItemProperty -Path '$RegPath' -Name '$ValueName'" -ForegroundColor Yellow
-Write-Host ""
-
-Write-Status "Remediation complete." Pass
+Write-Host "`nRemediation complete. A restart of WinRM service may be required." -ForegroundColor Green
 </pre>
 </div>
 
-<p>Locks idle systems to reduce unauthorized access risk.</p>
+<p>Basic authentication uses plain text passwords that could be used to compromise a system.</p>
 </div>
 
 <!-- ===================== STIG 7 ===================== -->
@@ -653,180 +550,67 @@ Write-Status "Remediation complete." Pass
 <button onclick="copyCode(this)">Copy</button>
 <pre><#
 .SYNOPSIS
-    Remediates STIG WN11-CC-000285 - Windows Telemetry must be limited to
-    Security or Basic level.
+    Remediates STIG WN11-CC-000285 - Require Secure RPC Communications for RDP
 
 .DESCRIPTION
-    STIG ID   : WN11-CC-000285
-    Severity  : CAT II (Medium)
-    CCI       : CCI-001199
-    Rule ID   : SV-253371r958607_rule
-    Vuln ID   : V-253371
-
-    Finding:
-        Windows Telemetry (diagnostic data) sends system and usage data to
-        Microsoft. Higher telemetry levels may expose sensitive information.
-        Systems must be configured to limit telemetry to the minimum level.
-
-    Required setting:
-        Policy  : Allow Telemetry
-        Value   : 0 (Security) or 1 (Basic)
-
-        Registry: HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection
-                  AllowTelemetry = 0 or 1 (DWORD)
-
-    Group Policy equivalent:
-        Computer Configuration >> Administrative Templates >>
-        Windows Components >> Data Collection and Preview Builds >>
-        "Allow Telemetry" = Enabled (0 or 1)
+    Configures Remote Desktop Session Host to require secure RPC communications,
+    ensuring encrypted and authenticated RPC traffic for RDP sessions.
 
 .NOTES
-    - Must be run as Administrator (elevated PowerShell).
-    - This script enforces the most restrictive compliant value (0).
-    - On domain-joined systems, domain GPO may override this setting.
-    - Some editions of Windows may enforce minimum telemetry levels.
-
-.EXAMPLE
-    .\Remediate-WN11-CC-000285.ps1
+    Run as Administrator
 #>
 
-#Requires -RunAsAdministrator
+Write-Host "Applying STIG WN11-CC-000285 remediation..." -ForegroundColor Cyan
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
+# Registry path for RDP Session Host security settings
+$Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"
 
-# ── Configuration ─────────────────────────────────────────────────────────────
-$StigId      = 'WN11-CC-000285'
-$RegPath     = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection'
-$ValueName   = 'AllowTelemetry'
-$RequiredVal = 0   # Most restrictive compliant value (0 or 1 allowed)
-
-# ── Helper: write a timestamped, coloured status line ─────────────────────────
-function Write-Status {
-    param(
-        [string]$Message,
-        [ValidateSet('Info','Pass','Fail','Action','Warn')]
-        [string]$Level = 'Info'
-    )
-    $colour = switch ($Level) {
-        'Pass'   { 'Green'  }
-        'Fail'   { 'Red'    }
-        'Action' { 'Cyan'   }
-        'Warn'   { 'Yellow' }
-        default  { 'White'  }
-    }
-    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
+# Create key if it doesn't exist
+if (-not (Test-Path $Path)) {
+    New-Item -Path $Path -Force | Out-Null
 }
 
-# ── Helper: get current value ─────────────────────────────────────────────────
-function Get-PolicyValue {
-    if (Test-Path $RegPath) {
-        try {
-            return (Get-ItemProperty -Path $RegPath -Name $ValueName -ErrorAction Stop).$ValueName
-        }
-        catch {
-            return $null
-        }
-    }
-    return $null
+# Require secure RPC communication
+# 1 = Require secure RPC (STIG compliant)
+New-ItemProperty -Path $Path `
+    -Name "fEncryptRPCTraffic" `
+    -PropertyType DWord `
+    -Value 1 `
+    -Force | Out-Null
+
+# Alternative/related enforcement depending on policy baseline
+New-ItemProperty -Path $Path `
+    -Name "fPromptForPassword" `
+    -PropertyType DWord `
+    -Value 1 `
+    -Force | Out-Null
+
+# Optional: enforce TLS for RDP connections
+New-ItemProperty -Path $Path `
+    -Name "SecurityLayer" `
+    -PropertyType DWord `
+    -Value 2 `
+    -Force | Out-Null
+
+# Optional: force Network Level Authentication (strongly recommended with STIG)
+New-ItemProperty -Path $Path `
+    -Name "UserAuthentication" `
+    -PropertyType DWord `
+    -Value 1 `
+    -Force | Out-Null
+
+# Validation
+$result = Get-ItemProperty -Path $Path -Name "fEncryptRPCTraffic" -ErrorAction SilentlyContinue
+
+if ($result.fEncryptRPCTraffic -eq 1) {
+    Write-Host "STIG WN11-CC-000285 successfully remediated." -ForegroundColor Green
+} else {
+    Write-Host "STIG remediation FAILED." -ForegroundColor Red
 }
-
-# ── Helper: set value ─────────────────────────────────────────────────────────
-function Set-PolicyValue {
-    Write-Status "Applying registry setting..." Action
-
-    if (-not (Test-Path $RegPath)) {
-        Write-Status "Registry path does not exist. Creating..." Action
-        New-Item -Path $RegPath -Force | Out-Null
-    }
-
-    New-ItemProperty -Path $RegPath -Name $ValueName -Value $RequiredVal -PropertyType DWord -Force | Out-Null
-}
-
-# ── Main ──────────────────────────────────────────────────────────────────────
-Write-Status "Starting remediation for $StigId" Info
-Write-Status "Control: Windows Telemetry must be set to Security (0) or Basic (1)" Info
-Write-Host   ""
-
-# ── Pre-check ─────────────────────────────────────────────────────────────────
-Write-Status "PRE-CHECK" Info
-
-$currentValue = Get-PolicyValue
-
-if ($null -eq $currentValue) {
-    Write-Status "Telemetry setting not configured -- FINDING" Fail
-}
-elseif ($currentValue -gt 1) {
-    Write-Status "Telemetry level = $currentValue (exceeds allowed maximum of 1) -- FINDING" Fail
-}
-else {
-    Write-Status "Telemetry level = $currentValue (within compliant range 0–1) -- ALREADY COMPLIANT" Pass
-    Write-Host ""
-    Write-Status "No changes required. Exiting." Info
-    exit 0
-}
-
-Write-Host ""
-
-# ── Remediation ───────────────────────────────────────────────────────────────
-Write-Status "REMEDIATION" Action
-
-try {
-    Set-PolicyValue
-    Write-Status "Telemetry level set to $RequiredVal (Security)." Action
-}
-catch {
-    Write-Status "Failed to apply registry setting: $_" Fail
-    exit 1
-}
-
-Write-Host ""
-
-# ── Post-check / Verification ─────────────────────────────────────────────────
-Write-Status "POST-CHECK / VERIFICATION" Info
-
-Start-Sleep -Seconds 2
-
-$verifyValue = Get-PolicyValue
-
-if ($verifyValue -le 1) {
-    Write-Status "VERIFICATION PASSED: Telemetry level = $verifyValue -- COMPLIANT" Pass
-}
-else {
-    Write-Status "VERIFICATION FAILED: Telemetry level = $verifyValue (non-compliant)" Fail
-    exit 1
-}
-
-Write-Host ""
-
-# ── Summary ───────────────────────────────────────────────────────────────────
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Status "Remediation Summary" Info
-Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
-Write-Host   "  Setting   : Allow Telemetry" -ForegroundColor White
-Write-Host   "  Value Set : $RequiredVal (Security)" -ForegroundColor White
-Write-Host   "  Method    : Registry (Policy-based)" -ForegroundColor White
-Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Host ""
-
-Write-Status "NOTE: Domain GPO may override this setting." Warn
-Write-Status "      Verify in Group Policy if system is domain-joined." Warn
-Write-Host   "      Location: Computer Configuration >> Administrative Templates >>" -ForegroundColor Yellow
-Write-Host   "      Windows Components >> Data Collection and Preview Builds >>" -ForegroundColor Yellow
-Write-Host   "      'Allow Telemetry' = Enabled (0 or 1)" -ForegroundColor Yellow
-Write-Host ""
-
-Write-Status "You can also verify with:" Warn
-Write-Host   "      Get-ItemProperty -Path '$RegPath' -Name '$ValueName'" -ForegroundColor Yellow
-Write-Host ""
-
-Write-Status "Remediation complete." Pass
 </pre>
 </div>
 
-<p>Prevents unauthorized guest logins.</p>
+<p>Allowing unsecure RPC communication exposes the system to man in the middle attacks and data disclosure attacks. A man in the middle attack occurs when an intruder captures packets between a client and server and modifies them before allowing the packets to be exchanged. Usually the attacker will modify the information in the packets in an attempt to cause either the client or server to reveal sensitive information.</p>
 </div>
 
 <!-- ===================== STIG 8 ===================== -->
