@@ -383,7 +383,187 @@ Write-Status "Remediation complete." Pass
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
-<pre>Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart</pre>
+<pre><#
+.SYNOPSIS
+    Remediates STIG WN11-00-000160 - The Windows 11 system must be configured
+    to require a password on wakeup from sleep.
+
+.DESCRIPTION
+    STIG ID   : WN11-00-000160
+    Severity  : CAT II (Medium)
+    CCI       : CCI-000056
+    Rule ID   : SV-253269r958301_rule
+    Vuln ID   : V-253269
+
+    Finding:
+        If the system does not require a password when resuming from sleep,
+        an unauthorized user could access the system without authentication.
+        Requiring a password on wake helps protect against unauthorized access
+        when a system is left unattended.
+
+    Required setting:
+        Policy  : Require a password when a computer wakes (plugged in)
+        Value   : Enabled
+        Registry: HKLM\SOFTWARE\Policies\Microsoft\Power\PowerSettings\
+                  <GUID>\ACSettingIndex = 1
+
+        Subgroup GUID : 7516b95f-f776-4464-8c53-06167f40cc99
+        Setting GUID  : 7bc4a2f9-d8fc-4469-b07b-33eb785aaca0
+
+    Group Policy equivalent:
+        Computer Configuration >> Administrative Templates >>
+        System >> Power Management >> Sleep Settings >>
+        "Require a password when a computer wakes (plugged in)" = Enabled
+
+.NOTES
+    - Must be run as Administrator.
+    - This script enforces the setting for AC power (plugged in).
+    - DC (battery) can be added if required.
+    - On domain-joined systems, GPO may override this setting.
+    - A gpupdate or reboot may be required for full enforcement.
+
+.EXAMPLE
+    .\Remediate-WN11-00-000160.ps1
+#>
+
+#Requires -RunAsAdministrator
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+$StigId = 'WN11-00-000160'
+
+$SubGroupGuid = '7516b95f-f776-4464-8c53-06167f40cc99'
+$SettingGuid  = '7bc4a2f9-d8fc-4469-b07b-33eb785aaca0'
+
+$RegPath = "HKLM:\SOFTWARE\Policies\Microsoft\Power\PowerSettings\$SubGroupGuid\$SettingGuid"
+$ValueName = 'ACSettingIndex'
+$RequiredVal = 1
+
+# ── Helper: write a timestamped, coloured status line ─────────────────────────
+function Write-Status {
+    param(
+        [string]$Message,
+        [ValidateSet('Info','Pass','Fail','Action','Warn')]
+        [string]$Level = 'Info'
+    )
+    $colour = switch ($Level) {
+        'Pass'   { 'Green'  }
+        'Fail'   { 'Red'    }
+        'Action' { 'Cyan'   }
+        'Warn'   { 'Yellow' }
+        default  { 'White'  }
+    }
+    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
+}
+
+# ── Helper: get current value ─────────────────────────────────────────────────
+function Get-PolicyValue {
+    if (Test-Path $RegPath) {
+        try {
+            return (Get-ItemProperty -Path $RegPath -Name $ValueName -ErrorAction Stop).$ValueName
+        }
+        catch {
+            return $null
+        }
+    }
+    return $null
+}
+
+# ── Helper: set value ─────────────────────────────────────────────────────────
+function Set-PolicyValue {
+    Write-Status "Applying registry setting..." Action
+
+    if (-not (Test-Path $RegPath)) {
+        Write-Status "Registry path does not exist. Creating..." Action
+        New-Item -Path $RegPath -Force | Out-Null
+    }
+
+    New-ItemProperty -Path $RegPath -Name $ValueName -Value $RequiredVal -PropertyType DWord -Force | Out-Null
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+Write-Status "Starting remediation for $StigId" Info
+Write-Status "Control: Require a password when a computer wakes (plugged in) must be Enabled" Info
+Write-Host   ""
+
+# ── Pre-check ─────────────────────────────────────────────────────────────────
+Write-Status "PRE-CHECK" Info
+
+$currentValue = Get-PolicyValue
+
+if ($null -eq $currentValue) {
+    Write-Status "Policy not set -- FINDING" Fail
+}
+elseif ($currentValue -ne $RequiredVal) {
+    Write-Status "Current value = $currentValue (expected $RequiredVal) -- FINDING" Fail
+}
+else {
+    Write-Status "Current value = $currentValue -- ALREADY COMPLIANT" Pass
+    Write-Host ""
+    Write-Status "No changes required. Exiting." Info
+    exit 0
+}
+
+Write-Host ""
+
+# ── Remediation ───────────────────────────────────────────────────────────────
+Write-Status "REMEDIATION" Action
+
+try {
+    Set-PolicyValue
+    Write-Status "Registry successfully updated." Action
+}
+catch {
+    Write-Status "Failed to apply setting: $_" Fail
+    exit 1
+}
+
+Write-Host ""
+
+# ── Post-check / Verification ─────────────────────────────────────────────────
+Write-Status "POST-CHECK / VERIFICATION" Info
+
+Start-Sleep -Seconds 2
+
+$verifyValue = Get-PolicyValue
+
+if ($verifyValue -eq $RequiredVal) {
+    Write-Status "VERIFICATION PASSED: Setting = $verifyValue -- COMPLIANT" Pass
+}
+else {
+    Write-Status "VERIFICATION FAILED: Setting = $verifyValue (expected $RequiredVal)" Fail
+    exit 1
+}
+
+Write-Host ""
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Status "Remediation Summary" Info
+Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
+Write-Host   "  Setting   : Require password on wake (AC)" -ForegroundColor White
+Write-Host   "  Value Set : Enabled (ACSettingIndex = 1)" -ForegroundColor White
+Write-Host   "  Method    : Registry (Policy-based)" -ForegroundColor White
+Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host ""
+
+Write-Status "NOTE: Domain GPO may override this setting." Warn
+Write-Status "      Verify in Group Policy if system is domain-joined." Warn
+Write-Host   "      Location: Computer Configuration >> Administrative Templates >> System >>" -ForegroundColor Yellow
+Write-Host   "      Power Management >> Sleep Settings >>" -ForegroundColor Yellow
+Write-Host   "      'Require a password when a computer wakes (plugged in)' = Enabled" -ForegroundColor Yellow
+Write-Host ""
+
+Write-Status "You can also verify with:" Warn
+Write-Host   "      powercfg /query SCHEME_CURRENT SUB_SLEEP CONSOLELOCK" -ForegroundColor Yellow
+Write-Host ""
+
+Write-Status "Remediation complete." Pass
+</pre>
 </div>
 
 <p>Removes vulnerable legacy file-sharing protocol.</p>
@@ -412,7 +592,182 @@ Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
-<pre>powercfg /change monitor-timeout-ac 15</pre>
+<pre><#
+.SYNOPSIS
+    Remediates STIG WN11-CC-000345 - Automatic download of updates for
+    Microsoft Store apps must be disabled.
+
+.DESCRIPTION
+    STIG ID   : WN11-CC-000345
+    Severity  : CAT II (Medium)
+    CCI       : CCI-001812
+    Rule ID   : SV-253404r958708_rule
+    Vuln ID   : V-253404
+
+    Finding:
+        Automatic downloading and updating of Microsoft Store apps may
+        introduce unapproved software changes into the environment.
+        Disabling this feature ensures better control over application
+        updates in managed environments.
+
+    Required setting:
+        Policy  : Turn off Automatic Download and Install of updates
+        Value   : Enabled (this disables auto-downloads)
+        Registry: HKLM\SOFTWARE\Policies\Microsoft\WindowsStore
+                  AutoDownload = 2 (DWORD)
+
+        Value meaning:
+            2 = Turn off automatic download and install of updates
+
+    Group Policy equivalent:
+        Computer Configuration >> Administrative Templates >>
+        Windows Components >> Store >>
+        "Turn off Automatic Download and Install of updates" = Enabled
+
+.NOTES
+    - Must be run as Administrator (elevated PowerShell).
+    - Policy is enforced via registry (policy-backed).
+    - On domain-joined systems, domain GPO may override this setting.
+    - No reboot required; may require gpupdate.
+
+.EXAMPLE
+    .\Remediate-WN11-CC-000345.ps1
+#>
+
+#Requires -RunAsAdministrator
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+$StigId      = 'WN11-CC-000345'
+$RegPath     = 'HKLM:\SOFTWARE\Policies\Microsoft\WindowsStore'
+$ValueName   = 'AutoDownload'
+$RequiredVal = 2
+
+# ── Helper: write a timestamped, coloured status line ─────────────────────────
+function Write-Status {
+    param(
+        [string]$Message,
+        [ValidateSet('Info','Pass','Fail','Action','Warn')]
+        [string]$Level = 'Info'
+    )
+    $colour = switch ($Level) {
+        'Pass'   { 'Green'  }
+        'Fail'   { 'Red'    }
+        'Action' { 'Cyan'   }
+        'Warn'   { 'Yellow' }
+        default  { 'White'  }
+    }
+    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
+}
+
+# ── Helper: get current value ─────────────────────────────────────────────────
+function Get-PolicyValue {
+    if (Test-Path $RegPath) {
+        try {
+            return (Get-ItemProperty -Path $RegPath -Name $ValueName -ErrorAction Stop).$ValueName
+        }
+        catch {
+            return $null
+        }
+    }
+    return $null
+}
+
+# ── Helper: set value ─────────────────────────────────────────────────────────
+function Set-PolicyValue {
+    Write-Status "Applying registry setting..." Action
+
+    if (-not (Test-Path $RegPath)) {
+        Write-Status "Registry path does not exist. Creating..." Action
+        New-Item -Path $RegPath -Force | Out-Null
+    }
+
+    New-ItemProperty -Path $RegPath -Name $ValueName -Value $RequiredVal -PropertyType DWord -Force | Out-Null
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+Write-Status "Starting remediation for $StigId" Info
+Write-Status "Control: Disable automatic download/install of Microsoft Store app updates" Info
+Write-Host   ""
+
+# ── Pre-check ─────────────────────────────────────────────────────────────────
+Write-Status "PRE-CHECK" Info
+
+$currentValue = Get-PolicyValue
+
+if ($null -eq $currentValue) {
+    Write-Status "Registry value not set -- FINDING" Fail
+}
+elseif ($currentValue -ne $RequiredVal) {
+    Write-Status "Registry value = $currentValue (expected $RequiredVal) -- FINDING" Fail
+}
+else {
+    Write-Status "Registry value = $currentValue -- ALREADY COMPLIANT" Pass
+    Write-Host ""
+    Write-Status "No changes required. Exiting." Info
+    exit 0
+}
+
+Write-Host ""
+
+# ── Remediation ───────────────────────────────────────────────────────────────
+Write-Status "REMEDIATION" Action
+
+try {
+    Set-PolicyValue
+    Write-Status "Registry successfully updated." Action
+}
+catch {
+    Write-Status "Failed to apply registry setting: $_" Fail
+    exit 1
+}
+
+Write-Host ""
+
+# ── Post-check / Verification ─────────────────────────────────────────────────
+Write-Status "POST-CHECK / VERIFICATION" Info
+
+Start-Sleep -Seconds 2
+
+$verifyValue = Get-PolicyValue
+
+if ($verifyValue -eq $RequiredVal) {
+    Write-Status "VERIFICATION PASSED: Registry value = $verifyValue -- COMPLIANT" Pass
+}
+else {
+    Write-Status "VERIFICATION FAILED: Registry value = $verifyValue (expected $RequiredVal)" Fail
+    exit 1
+}
+
+Write-Host ""
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Status "Remediation Summary" Info
+Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
+Write-Host   "  Setting   : Microsoft Store auto-update behavior" -ForegroundColor White
+Write-Host   "  Value Set : Disabled (AutoDownload = 2)" -ForegroundColor White
+Write-Host   "  Method    : Registry (Policy-based)" -ForegroundColor White
+Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host ""
+
+Write-Status "NOTE: Domain GPO may override this setting." Warn
+Write-Status "      Verify in Group Policy if system is domain-joined." Warn
+Write-Host   "      Location: Computer Configuration >> Administrative Templates >>" -ForegroundColor Yellow
+Write-Host   "      Windows Components >> Store >>" -ForegroundColor Yellow
+Write-Host   "      'Turn off Automatic Download and Install of updates' = Enabled" -ForegroundColor Yellow
+Write-Host ""
+
+Write-Status "You can also verify with:" Warn
+Write-Host   "      Get-ItemProperty -Path '$RegPath' -Name '$ValueName'" -ForegroundColor Yellow
+Write-Host ""
+
+Write-Status "Remediation complete." Pass
+</pre>
 </div>
 
 <p>Locks idle systems to reduce unauthorized access risk.</p>
@@ -425,7 +780,179 @@ Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
-<pre>net user guest /active:no</pre>
+<pre><#
+.SYNOPSIS
+    Remediates STIG WN11-CC-000285 - Windows Telemetry must be limited to
+    Security or Basic level.
+
+.DESCRIPTION
+    STIG ID   : WN11-CC-000285
+    Severity  : CAT II (Medium)
+    CCI       : CCI-001199
+    Rule ID   : SV-253371r958607_rule
+    Vuln ID   : V-253371
+
+    Finding:
+        Windows Telemetry (diagnostic data) sends system and usage data to
+        Microsoft. Higher telemetry levels may expose sensitive information.
+        Systems must be configured to limit telemetry to the minimum level.
+
+    Required setting:
+        Policy  : Allow Telemetry
+        Value   : 0 (Security) or 1 (Basic)
+
+        Registry: HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection
+                  AllowTelemetry = 0 or 1 (DWORD)
+
+    Group Policy equivalent:
+        Computer Configuration >> Administrative Templates >>
+        Windows Components >> Data Collection and Preview Builds >>
+        "Allow Telemetry" = Enabled (0 or 1)
+
+.NOTES
+    - Must be run as Administrator (elevated PowerShell).
+    - This script enforces the most restrictive compliant value (0).
+    - On domain-joined systems, domain GPO may override this setting.
+    - Some editions of Windows may enforce minimum telemetry levels.
+
+.EXAMPLE
+    .\Remediate-WN11-CC-000285.ps1
+#>
+
+#Requires -RunAsAdministrator
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+$StigId      = 'WN11-CC-000285'
+$RegPath     = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection'
+$ValueName   = 'AllowTelemetry'
+$RequiredVal = 0   # Most restrictive compliant value (0 or 1 allowed)
+
+# ── Helper: write a timestamped, coloured status line ─────────────────────────
+function Write-Status {
+    param(
+        [string]$Message,
+        [ValidateSet('Info','Pass','Fail','Action','Warn')]
+        [string]$Level = 'Info'
+    )
+    $colour = switch ($Level) {
+        'Pass'   { 'Green'  }
+        'Fail'   { 'Red'    }
+        'Action' { 'Cyan'   }
+        'Warn'   { 'Yellow' }
+        default  { 'White'  }
+    }
+    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
+}
+
+# ── Helper: get current value ─────────────────────────────────────────────────
+function Get-PolicyValue {
+    if (Test-Path $RegPath) {
+        try {
+            return (Get-ItemProperty -Path $RegPath -Name $ValueName -ErrorAction Stop).$ValueName
+        }
+        catch {
+            return $null
+        }
+    }
+    return $null
+}
+
+# ── Helper: set value ─────────────────────────────────────────────────────────
+function Set-PolicyValue {
+    Write-Status "Applying registry setting..." Action
+
+    if (-not (Test-Path $RegPath)) {
+        Write-Status "Registry path does not exist. Creating..." Action
+        New-Item -Path $RegPath -Force | Out-Null
+    }
+
+    New-ItemProperty -Path $RegPath -Name $ValueName -Value $RequiredVal -PropertyType DWord -Force | Out-Null
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+Write-Status "Starting remediation for $StigId" Info
+Write-Status "Control: Windows Telemetry must be set to Security (0) or Basic (1)" Info
+Write-Host   ""
+
+# ── Pre-check ─────────────────────────────────────────────────────────────────
+Write-Status "PRE-CHECK" Info
+
+$currentValue = Get-PolicyValue
+
+if ($null -eq $currentValue) {
+    Write-Status "Telemetry setting not configured -- FINDING" Fail
+}
+elseif ($currentValue -gt 1) {
+    Write-Status "Telemetry level = $currentValue (exceeds allowed maximum of 1) -- FINDING" Fail
+}
+else {
+    Write-Status "Telemetry level = $currentValue (within compliant range 0–1) -- ALREADY COMPLIANT" Pass
+    Write-Host ""
+    Write-Status "No changes required. Exiting." Info
+    exit 0
+}
+
+Write-Host ""
+
+# ── Remediation ───────────────────────────────────────────────────────────────
+Write-Status "REMEDIATION" Action
+
+try {
+    Set-PolicyValue
+    Write-Status "Telemetry level set to $RequiredVal (Security)." Action
+}
+catch {
+    Write-Status "Failed to apply registry setting: $_" Fail
+    exit 1
+}
+
+Write-Host ""
+
+# ── Post-check / Verification ─────────────────────────────────────────────────
+Write-Status "POST-CHECK / VERIFICATION" Info
+
+Start-Sleep -Seconds 2
+
+$verifyValue = Get-PolicyValue
+
+if ($verifyValue -le 1) {
+    Write-Status "VERIFICATION PASSED: Telemetry level = $verifyValue -- COMPLIANT" Pass
+}
+else {
+    Write-Status "VERIFICATION FAILED: Telemetry level = $verifyValue (non-compliant)" Fail
+    exit 1
+}
+
+Write-Host ""
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Status "Remediation Summary" Info
+Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
+Write-Host   "  Setting   : Allow Telemetry" -ForegroundColor White
+Write-Host   "  Value Set : $RequiredVal (Security)" -ForegroundColor White
+Write-Host   "  Method    : Registry (Policy-based)" -ForegroundColor White
+Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host ""
+
+Write-Status "NOTE: Domain GPO may override this setting." Warn
+Write-Status "      Verify in Group Policy if system is domain-joined." Warn
+Write-Host   "      Location: Computer Configuration >> Administrative Templates >>" -ForegroundColor Yellow
+Write-Host   "      Windows Components >> Data Collection and Preview Builds >>" -ForegroundColor Yellow
+Write-Host   "      'Allow Telemetry' = Enabled (0 or 1)" -ForegroundColor Yellow
+Write-Host ""
+
+Write-Status "You can also verify with:" Warn
+Write-Host   "      Get-ItemProperty -Path '$RegPath' -Name '$ValueName'" -ForegroundColor Yellow
+Write-Host ""
+
+Write-Status "Remediation complete." Pass
+</pre>
 </div>
 
 <p>Prevents unauthorized guest logins.</p>
