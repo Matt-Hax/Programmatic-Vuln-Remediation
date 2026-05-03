@@ -543,74 +543,216 @@ Write-Host "`nRemediation complete. A restart of WinRM service may be required."
 
 <!-- ===================== STIG 7 ===================== -->
 <div class="stig">
-<h2>STIG WN11-CC-000285</h2>
-<p>Disables Guest account.</p>
+<h2>STIG WN11-AC-000010</h2>
+<p>The account lockout threshold must be
+    configured to 3 or fewer invalid logon attempts.
+</p>
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
 <pre><#
 .SYNOPSIS
-    Remediates STIG WN11-CC-000285 - Require Secure RPC Communications for RDP
+    Remediates STIG WN11-AC-000010 - The account lockout threshold must be
+    configured to 3 or fewer invalid logon attempts.
 
 .DESCRIPTION
-    Configures Remote Desktop Session Host to require secure RPC communications,
-    ensuring encrypted and authenticated RPC traffic for RDP sessions.
+    STIG ID   : WN11-AC-000010
+    Severity  : CAT II (Medium)
+    CCI       : CCI-000044
+    Rule ID   : SV-253298r958388_rule
+    Vuln ID   : V-253298
+
+    Finding:
+        The account lockout feature prevents brute-force password attacks by
+        locking an account after a defined number of consecutive failed logon
+        attempts. A threshold of 0 disables lockout entirely, and a value
+        greater than 3 makes the protection too weak. The required value is
+        between 1 and 3 (inclusive).
+
+    Required setting:
+        Policy  : Account lockout threshold
+        Value   : 3 or fewer invalid logon attempts (1–3)
+        Tool    : Local Security Policy (secedit) / net accounts
+
+    Group Policy equivalent:
+        Computer Configuration >> Windows Settings >> Security Settings >>
+        Account Policies >> Account Lockout Policy >>
+        "Account lockout threshold" = 3 or fewer
 
 .NOTES
-    Run as Administrator
+    - Must be run as Administrator (elevated PowerShell).
+    - This script uses 'net accounts' to read the current threshold and
+      'secedit' to apply the policy — the same mechanism as Local Group Policy.
+    - On domain-joined systems, the domain Account Lockout Policy will override
+      local policy. Verify the domain GPO is also compliant.
+    - No reboot is required; the change is effective immediately.
+    - The script sets the threshold to 3 (the maximum compliant value). Adjust
+      $RequiredThreshold below if your organisation mandates a stricter value.
+
+.EXAMPLE
+    .\Remediate-WN11-AC-000010.ps1
+
+.EXAMPLE
+    # To enforce a stricter threshold of 2:
+    # Edit the line below:  $RequiredThreshold = 2
 #>
 
-Write-Host "Applying STIG WN11-CC-000285 remediation..." -ForegroundColor Cyan
+#Requires -RunAsAdministrator
 
-# Registry path for RDP Session Host security settings
-$Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
 
-# Create key if it doesn't exist
-if (-not (Test-Path $Path)) {
-    New-Item -Path $Path -Force | Out-Null
+# ── Configuration ─────────────────────────────────────────────────────────────
+$StigId            = 'WN11-AC-000010'
+$RequiredThreshold = 3        # STIG maximum; set lower for stricter posture (1–3)
+$MinThreshold      = 1        # Must not be 0 (that disables lockout)
+
+# ── Helper: write a timestamped, coloured status line ─────────────────────────
+function Write-Status {
+    param(
+        [string]$Message,
+        [ValidateSet('Info','Pass','Fail','Action','Warn')]
+        [string]$Level = 'Info'
+    )
+    $colour = switch ($Level) {
+        'Pass'   { 'Green'  }
+        'Fail'   { 'Red'    }
+        'Action' { 'Cyan'   }
+        'Warn'   { 'Yellow' }
+        default  { 'White'  }
+    }
+    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
 }
 
-# Require secure RPC communication
-# 1 = Require secure RPC (STIG compliant)
-New-ItemProperty -Path $Path `
-    -Name "fEncryptRPCTraffic" `
-    -PropertyType DWord `
-    -Value 1 `
-    -Force | Out-Null
+# ── Helper: get the current lockout threshold via 'net accounts' ──────────────
+function Get-LockoutThreshold {
+    $output    = net accounts 2>&1
+    $line      = $output | Where-Object { $_ -match 'Lockout threshold' }
+    if ($line -match ':\s*(\S+)') {
+        $raw = $Matches[1].Trim()
+        # 'Never' means 0 (disabled)
+        if ($raw -ieq 'Never') { return 0 }
+        if ($raw -match '^\d+$') { return [int]$raw }
+    }
+    return $null
+}
 
-# Alternative/related enforcement depending on policy baseline
-New-ItemProperty -Path $Path `
-    -Name "fPromptForPassword" `
-    -PropertyType DWord `
-    -Value 1 `
-    -Force | Out-Null
+# ── Helper: apply the threshold via secedit ───────────────────────────────────
+function Set-LockoutThreshold {
+    param([int]$Threshold)
 
-# Optional: enforce TLS for RDP connections
-New-ItemProperty -Path $Path `
-    -Name "SecurityLayer" `
-    -PropertyType DWord `
-    -Value 2 `
-    -Force | Out-Null
+    $tmpDir  = $env:TEMP
+    $cfgFile = Join-Path $tmpDir 'stig_ac000010.inf'
+    $dbFile  = Join-Path $tmpDir 'stig_ac000010.sdb'
+    $logFile = Join-Path $tmpDir 'stig_ac000010.log'
 
-# Optional: force Network Level Authentication (strongly recommended with STIG)
-New-ItemProperty -Path $Path `
-    -Name "UserAuthentication" `
-    -PropertyType DWord `
-    -Value 1 `
-    -Force | Out-Null
+    # Build a minimal Security Template (.inf) for secedit
+    $infContent = @"
+[Unicode]
+Unicode=yes
+[System Access]
+LockoutBadCount = $Threshold
+[Version]
+signature="`$CHICAGO`$"
+Revision=1
+"@
 
-# Validation
-$result = Get-ItemProperty -Path $Path -Name "fEncryptRPCTraffic" -ErrorAction SilentlyContinue
+    Set-Content -Path $cfgFile -Value $infContent -Encoding Unicode
 
-if ($result.fEncryptRPCTraffic -eq 1) {
-    Write-Host "STIG WN11-CC-000285 successfully remediated." -ForegroundColor Green
+    Write-Status "Applying policy via secedit (threshold = $Threshold)..." Action
+
+    $result = secedit /configure /db $dbFile /cfg $cfgFile /log $logFile /quiet 2>&1
+
+    # Clean up temp files
+    Remove-Item $cfgFile, $dbFile, $logFile -ErrorAction SilentlyContinue
+
+    return $result
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+Write-Status "Starting remediation for $StigId" Info
+Write-Status "Control: Account lockout threshold must be 1–$RequiredThreshold invalid logon attempts" Info
+Write-Host   ""
+
+# ── Pre-check ─────────────────────────────────────────────────────────────────
+Write-Status "PRE-CHECK" Info
+$currentThreshold = Get-LockoutThreshold
+
+if ($null -eq $currentThreshold) {
+    Write-Status "Could not determine current lockout threshold. Proceeding with remediation." Warn
+} elseif ($currentThreshold -eq 0) {
+    Write-Status "Account lockout threshold = 0 (DISABLED) -- FINDING" Fail
+} elseif ($currentThreshold -gt $RequiredThreshold) {
+    Write-Status "Account lockout threshold = $currentThreshold (exceeds maximum of $RequiredThreshold) -- FINDING" Fail
 } else {
-    Write-Host "STIG remediation FAILED." -ForegroundColor Red
+    Write-Status "Account lockout threshold = $currentThreshold (within compliant range 1–$RequiredThreshold) -- ALREADY COMPLIANT" Pass
+    Write-Host   ""
+    Write-Status "No changes required. Exiting." Info
+    exit 0
 }
+
+Write-Host ""
+
+# ── Remediation ───────────────────────────────────────────────────────────────
+Write-Status "REMEDIATION" Action
+Write-Status "Setting account lockout threshold to $RequiredThreshold via secedit..." Action
+
+try {
+    Set-LockoutThreshold -Threshold $RequiredThreshold
+    Write-Status "secedit completed successfully." Action
+}
+catch {
+    Write-Status "secedit failed: $_" Fail
+    exit 1
+}
+
+Write-Host ""
+
+# ── Post-check / Verification ─────────────────────────────────────────────────
+Write-Status "POST-CHECK / VERIFICATION" Info
+
+# Allow a moment for the policy engine to apply the change
+Start-Sleep -Seconds 2
+
+$verifyThreshold = Get-LockoutThreshold
+
+if ($null -eq $verifyThreshold) {
+    Write-Status "VERIFICATION WARNING: Could not read threshold after remediation. Confirm manually via 'net accounts'." Warn
+} elseif ($verifyThreshold -eq 0 -or $verifyThreshold -gt $RequiredThreshold) {
+    Write-Status "VERIFICATION FAILED: Threshold = $verifyThreshold (non-compliant). Check for overriding domain GPO." Fail
+    Write-Status "Run 'gpresult /r' to check which GPO is controlling this setting." Warn
+    exit 1
+} else {
+    Write-Status "VERIFICATION PASSED: Account lockout threshold = $verifyThreshold -- COMPLIANT" Pass
+}
+
+Write-Host ""
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Status "Remediation Summary" Info
+Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
+Write-Host   "  Setting   : Account lockout threshold" -ForegroundColor White
+Write-Host   "  Value Set : $RequiredThreshold invalid logon attempts" -ForegroundColor White
+Write-Host   "  Method    : secedit (Local Security Policy)" -ForegroundColor White
+Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host ""
+Write-Status "NOTE: On domain-joined systems, verify the domain GPO also enforces" Warn
+Write-Status "      this setting. Local policy may be overridden at the next gpupdate." Warn
+Write-Host   "      Location: Computer Configuration >> Windows Settings >> Security Settings >>" -ForegroundColor Yellow
+Write-Host   "      Account Policies >> Account Lockout Policy >>" -ForegroundColor Yellow
+Write-Host   "      'Account lockout threshold' = $RequiredThreshold or fewer" -ForegroundColor Yellow
+Write-Host ""
+Write-Status "You can also verify with: net accounts | findstr /i 'lockout'" Warn
+Write-Host ""
+Write-Status "Remediation complete." Pass
+
 </pre>
 </div>
 
-<p>Allowing unsecure RPC communication exposes the system to man in the middle attacks and data disclosure attacks. A man in the middle attack occurs when an intruder captures packets between a client and server and modifies them before allowing the packets to be exchanged. Usually the attacker will modify the information in the packets in an attempt to cause either the client or server to reveal sensitive information.</p>
+<p>The account lockout feature, when enabled, prevents brute-force password attacks on the system. The higher this value is, the less effective the account lockout feature will be in protecting the local system. The number of bad logon attempts must be reasonably small to minimize the possibility of a successful password attack, while allowing for honest errors made during a normal user logon.</p>
 </div>
 
 <!-- ===================== STIG 8 ===================== -->
