@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>PowerShell STIG Implementations</title>
+
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -9,9 +10,16 @@
             background-color: #0d1117;
             color: #e6edf3;
         }
-        h1, h2 {
+
+        h1 {
             color: #58a6ff;
         }
+
+        h2 {
+            color: #58a6ff;
+            margin-bottom: 10px;
+        }
+
         .stig {
             margin-bottom: 40px;
             padding: 20px;
@@ -19,12 +27,41 @@
             border-radius: 10px;
             background-color: #161b22;
         }
+
         pre {
-            background: #0d1117;
+            margin: 0;
             padding: 15px;
+            background: #0d1117;
+            border: 1px solid #30363d;
             border-radius: 8px;
             overflow-x: auto;
-            border: 1px solid #30363d;
+            white-space: pre-wrap;
+        }
+
+        .code-block {
+            position: relative;
+            margin-top: 10px;
+        }
+
+        .code-block button {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .code-block button:hover {
+            background: #2ea043;
+        }
+
+        p {
+            color: #c9d1d9;
         }
     </style>
 </head>
@@ -32,111 +69,160 @@
 <body>
 
 <h1>PowerShell STIG Implementations</h1>
-<p>This repository contains PowerShell scripts used to remediate Windows STIG controls and enforce security compliance.</p>
+<p>Collection of STIG remediation scripts used for Windows hardening and cybersecurity compliance automation.</p>
 
 <!-- ===================== STIG 1 ===================== -->
 <div class="stig">
-<h2>1. STIG WN11-CC-000305</h2>
-<p><strong>Description:</strong> Enforces security settings related to Windows Defender behavior.</p>
-<pre>
-# Example Script
-Set-MpPreference -DisableRealtimeMonitoring $false
-</pre>
-<p><strong>Explanation:</strong> This ensures real-time protection is enabled to prevent malware execution.</p>
+<h2>STIG WN11-CC-000305</h2>
+<p>Enforces Windows Defender real-time protection.</p>
+
+<div class="code-block">
+<button onclick="copyCode(this)">Copy</button>
+<pre>Set-MpPreference -DisableRealtimeMonitoring $false</pre>
+</div>
+
+<p>Ensures endpoint protection is always active to prevent malware execution.</p>
 </div>
 
 <!-- ===================== STIG 2 ===================== -->
 <div class="stig">
-<h2>2. STIG WN11-CC-000252</h2>
-<p><strong>Description:</strong> Configures audit policy settings for logon events.</p>
-<pre>
-auditpol /set /subcategory:"Logon" /success:enable /failure:enable
-</pre>
-<p><strong>Explanation:</strong> This ensures successful and failed logon attempts are logged for investigation.</p>
+<h2>STIG WN11-CC-000252</h2>
+<p>Configures logon auditing.</p>
+
+<div class="code-block">
+<button onclick="copyCode(this)">Copy</button>
+<pre>auditpol /set /subcategory:"Logon" /success:enable /failure:enable</pre>
+</div>
+
+<p>Enables tracking of successful and failed logon attempts.</p>
 </div>
 
 <!-- ===================== STIG 3 ===================== -->
 <div class="stig">
-<h2>3. STIG WN11-CC-000326</h2>
-<p><strong>Description:</strong> Controls password complexity enforcement.</p>
+<h2>STIG WN11-CC-000326</h2>
+<p>Password policy enforcement.</p>
+
+<div class="code-block">
+<button onclick="copyCode(this)">Copy</button>
 <pre>
 net accounts /minpwlen:14
 net accounts /complexity:enabled
 </pre>
-<p><strong>Explanation:</strong> Forces strong password policies to reduce brute-force risk.</p>
+</div>
+
+<p>Strengthens authentication security against brute-force attacks.</p>
 </div>
 
 <!-- ===================== STIG 4 ===================== -->
 <div class="stig">
-<h2>4. STIG WN11-CC-000160</h2>
-<p><strong>Description:</strong> Disables SMBv1 protocol.</p>
-<pre>
-Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart
-</pre>
-<p><strong>Explanation:</strong> Removes legacy SMBv1 to prevent exploitation like EternalBlue.</p>
+<h2>STIG WN11-CC-000160</h2>
+<p>Disables SMBv1 protocol.</p>
+
+<div class="code-block">
+<button onclick="copyCode(this)">Copy</button>
+<pre>Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart</pre>
+</div>
+
+<p>Removes vulnerable legacy file-sharing protocol.</p>
 </div>
 
 <!-- ===================== STIG 5 ===================== -->
 <div class="stig">
-<h2>5. STIG WN11-CC-000005</h2>
-<p><strong>Description:</strong> Configures UAC behavior.</p>
+<h2>STIG WN11-CC-000005</h2>
+<p>Enables UAC (User Account Control).</p>
+
+<div class="code-block">
+<button onclick="copyCode(this)">Copy</button>
 <pre>
 Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" `
 -Name "EnableLUA" -Value 1
 </pre>
-<p><strong>Explanation:</strong> Ensures User Account Control is enabled to restrict privilege escalation.</p>
+</div>
+
+<p>Prevents silent privilege escalation.</p>
 </div>
 
 <!-- ===================== STIG 6 ===================== -->
 <div class="stig">
-<h2>6. STIG WN11-CC-000345</h2>
-<p><strong>Description:</strong> Enforces screen lock timeout.</p>
-<pre>
-powercfg /change monitor-timeout-ac 15
-</pre>
-<p><strong>Explanation:</strong> Locks inactive systems quickly to prevent unauthorized access.</p>
+<h2>STIG WN11-CC-000345</h2>
+<p>Screen lock timeout enforcement.</p>
+
+<div class="code-block">
+<button onclick="copyCode(this)">Copy</button>
+<pre>powercfg /change monitor-timeout-ac 15</pre>
+</div>
+
+<p>Locks idle systems to reduce unauthorized access risk.</p>
 </div>
 
 <!-- ===================== STIG 7 ===================== -->
 <div class="stig">
-<h2>7. STIG WN11-CC-000285</h2>
-<p><strong>Description:</strong> Disables guest account.</p>
-<pre>
-net user guest /active:no
-</pre>
-<p><strong>Explanation:</strong> Prevents unauthorized guest access to the system.</p>
+<h2>STIG WN11-CC-000285</h2>
+<p>Disables Guest account.</p>
+
+<div class="code-block">
+<button onclick="copyCode(this)">Copy</button>
+<pre>net user guest /active:no</pre>
+</div>
+
+<p>Prevents unauthorized guest logins.</p>
 </div>
 
 <!-- ===================== STIG 8 ===================== -->
 <div class="stig">
-<h2>8. STIG WN11-CC-000090</h2>
-<p><strong>Description:</strong> Enables audit object access.</p>
-<pre>
-auditpol /set /category:"Object Access" /success:enable /failure:enable
-</pre>
-<p><strong>Explanation:</strong> Tracks file and registry access for forensic analysis.</p>
+<h2>STIG WN11-CC-000090</h2>
+<p>Enables object access auditing.</p>
+
+<div class="code-block">
+<button onclick="copyCode(this)">Copy</button>
+<pre>auditpol /set /category:"Object Access" /success:enable /failure:enable</pre>
+</div>
+
+<p>Tracks file and registry access for forensic investigations.</p>
 </div>
 
 <!-- ===================== STIG 9 ===================== -->
 <div class="stig">
-<h2>9. STIG WN11-CC-000120</h2>
-<p><strong>Description:</strong> Enforces firewall domain profile.</p>
-<pre>
-Set-NetFirewallProfile -Profile Domain -Enabled True
-</pre>
-<p><strong>Explanation:</strong> Ensures firewall is active on domain networks.</p>
+<h2>STIG WN11-CC-000120</h2>
+<p>Enables Windows Firewall (Domain Profile).</p>
+
+<div class="code-block">
+<button onclick="copyCode(this)">Copy</button>
+<pre>Set-NetFirewallProfile -Profile Domain -Enabled True</pre>
+</div>
+
+<p>Ensures network filtering is enforced on domain networks.</p>
 </div>
 
 <!-- ===================== STIG 10 ===================== -->
 <div class="stig">
-<h2>10. STIG WN11-CC-000200</h2>
-<p><strong>Description:</strong> Disables auto-run for removable media.</p>
+<h2>STIG WN11-CC-000200</h2>
+<p>Disables AutoRun for removable media.</p>
+
+<div class="code-block">
+<button onclick="copyCode(this)">Copy</button>
 <pre>
 Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" `
 -Name "NoDriveTypeAutoRun" -Value 255
 </pre>
-<p><strong>Explanation:</strong> Prevents malware execution from USB devices.</p>
 </div>
+
+<p>Prevents malware execution from USB devices.</p>
+</div>
+
+<!-- ===================== SCRIPT ===================== -->
+<script>
+function copyCode(button) {
+    const code = button.nextElementSibling.innerText;
+
+    navigator.clipboard.writeText(code).then(() => {
+        button.innerText = "Copied!";
+        setTimeout(() => {
+            button.innerText = "Copy";
+        }, 1500);
+    });
+}
+</script>
 
 </body>
 </html>
