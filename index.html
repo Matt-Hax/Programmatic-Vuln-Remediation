@@ -757,25 +757,355 @@ Write-Status "Remediation complete." Pass
 
 <!-- ===================== STIG 8 ===================== -->
 <div class="stig">
-<h2>STIG WN11-CC-000090</h2>
-<p>Enables object access auditing.</p>
+<h2>STIG WN11-CC-000280</h2>
+<p>Remote Desktop Services must require
+    Network Level Authentication (NLA)..</p>
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
-<pre>auditpol /set /category:"Object Access" /success:enable /failure:enable</pre>
+<pre><#
+.SYNOPSIS
+    Remediates STIG WN11-CC-000280 - Remote Desktop Services must require
+    Network Level Authentication (NLA).
+
+.DESCRIPTION
+    STIG ID   : WN11-CC-000280
+    Severity  : CAT II (Medium)
+    CCI       : CCI-001453
+    Rule ID   : SV-253404r877394_rule
+    Vuln ID   : V-253404
+
+    Finding:
+        Remote Desktop Services (RDS) connections that do not require Network
+        Level Authentication (NLA) are susceptible to man-in-the-middle attacks
+        because a full desktop session is established before the user is
+        authenticated. NLA forces credential verification before the session is
+        created, reducing the attack surface.
+
+    Required registry state:
+        Hive  : HKEY_LOCAL_MACHINE
+        Path  : SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services
+        Name  : UserAuthentication
+        Type  : REG_DWORD
+        Value : 1  (Enabled / NLA required)
+
+    Group Policy equivalent:
+        Computer Configuration >> Administrative Templates >>
+        Windows Components >> Remote Desktop Services >>
+        Remote Desktop Session Host >> Security >>
+        "Require user authentication for remote connections by using
+         Network Level Authentication" = Enabled
+
+.NOTES
+    - Must be run as Administrator (elevated PowerShell).
+    - On domain-joined systems, Group Policy will re-apply this setting on the
+      next gpupdate cycle. Deploy via GPO for persistent enforcement.
+    - The script performs a pre-check, applies the fix, and then verifies the
+      result. No reboot is required; the change takes effect immediately for
+      new RDP connections.
+
+.EXAMPLE
+    .\Remediate-WN11-CC-000280.ps1
+#>
+
+#Requires -RunAsAdministrator
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+# ── Constants ────────────────────────────────────────────────────────────────
+$StigId      = 'WN11-CC-000280'
+$RegPath     = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services'
+$RegName     = 'UserAuthentication'
+$RegType     = 'DWord'
+$RequiredVal = 1
+
+# ── Helper: write a timestamped, coloured status line ────────────────────────
+function Write-Status {
+    param(
+        [string]$Message,
+        [ValidateSet('Info','Pass','Fail','Action','Warn')]
+        [string]$Level = 'Info'
+    )
+    $colour = switch ($Level) {
+        'Pass'   { 'Green'   }
+        'Fail'   { 'Red'     }
+        'Action' { 'Cyan'    }
+        'Warn'   { 'Yellow'  }
+        default  { 'White'   }
+    }
+    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
+}
+
+# ── Helper: read the current registry value (returns $null if missing) ───────
+function Get-CurrentValue {
+    try {
+        $prop = Get-ItemProperty -Path $RegPath -Name $RegName -ErrorAction Stop
+        return $prop.$RegName
+    }
+    catch {
+        return $null
+    }
+}
+
+# ── Main ─────────────────────────────────────────────────────────────────────
+Write-Status "Starting remediation for $StigId" Info
+Write-Status "Control: Remote Desktop Services must require Network Level Authentication (NLA)" Info
+Write-Host   ""
+
+# ── Pre-check ────────────────────────────────────────────────────────────────
+Write-Status "PRE-CHECK" Info
+$currentVal = Get-CurrentValue
+
+if ($null -eq $currentVal) {
+    Write-Status "Registry value '$RegName' does not exist under '$RegPath' -- FINDING" Fail
+} elseif ($currentVal -ne $RequiredVal) {
+    Write-Status "Registry value '$RegName' = $currentVal (expected $RequiredVal) -- FINDING" Fail
+} else {
+    Write-Status "Registry value '$RegName' = $currentVal -- ALREADY COMPLIANT" Pass
+    Write-Host   ""
+    Write-Status "No changes required. Exiting." Info
+    exit 0
+}
+
+Write-Host ""
+
+# ── Remediation ──────────────────────────────────────────────────────────────
+Write-Status "REMEDIATION" Action
+Write-Status "Ensuring registry key path exists: $RegPath" Action
+
+# Create the registry path if it does not exist
+if (-not (Test-Path -Path $RegPath)) {
+    New-Item -Path $RegPath -Force | Out-Null
+    Write-Status "Registry key created: $RegPath" Action
+} else {
+    Write-Status "Registry key already exists: $RegPath" Info
+}
+
+# Apply the required value
+Write-Status "Setting '$RegName' = $RequiredVal (REG_DWORD)" Action
+Set-ItemProperty -Path $RegPath -Name $RegName -Value $RequiredVal -Type $RegType -Force
+Write-Status "Registry value set successfully." Action
+
+Write-Host ""
+
+# ── Post-check / Verification ─────────────────────────────────────────────────
+Write-Status "POST-CHECK / VERIFICATION" Info
+$verifyVal = Get-CurrentValue
+
+if ($null -eq $verifyVal) {
+    Write-Status "VERIFICATION FAILED: Registry value '$RegName' not found after remediation!" Fail
+    exit 1
+} elseif ($verifyVal -ne $RequiredVal) {
+    Write-Status "VERIFICATION FAILED: '$RegName' = $verifyVal (expected $RequiredVal)" Fail
+    exit 1
+} else {
+    Write-Status "VERIFICATION PASSED: '$RegName' = $verifyVal -- COMPLIANT" Pass
+}
+
+Write-Host ""
+
+# ── Summary ──────────────────────────────────────────────────────────────────
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Status "Remediation Summary" Info
+Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
+Write-Host   "  Registry  : $RegPath\$RegName" -ForegroundColor White
+Write-Host   "  Type      : REG_DWORD" -ForegroundColor White
+Write-Host   "  Value Set : $RequiredVal (NLA Required)" -ForegroundColor White
+Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host ""
+Write-Status "NOTE: On domain-joined systems, enforce this via Group Policy (GPO) so it" Warn
+Write-Status "      persists across policy refresh cycles:" Warn
+Write-Host   "      Computer Configuration >> Admin Templates >> Windows Components >>" -ForegroundColor Yellow
+Write-Host   "      Remote Desktop Services >> RD Session Host >> Security >>" -ForegroundColor Yellow
+Write-Host   "      'Require NLA for remote connections' = Enabled" -ForegroundColor Yellow
+Write-Host ""
+Write-Status "Remediation complete." Pass
+</pre>
 </div>
 
-<p>Tracks file and registry access for forensic investigations.</p>
+<p>This setting controls the ability of users to supply passwords automatically as part of their remote desktop connection. Disabling this setting would allow anyone to use the stored credentials in a connection item to connect to the terminal server.</p>
 </div>
 
 <!-- ===================== STIG 9 ===================== -->
 <div class="stig">
-<h2>STIG WN11-CC-000120</h2>
-<p>Enables Windows Firewall (Domain Profile).</p>
+<h2>STIG WN11-CC-000005</h2>
+<p>Camera access from the lock screen must be disabled.</p>
 
 <div class="code-block">
 <button onclick="copyCode(this)">Copy</button>
-<pre>Set-NetFirewallProfile -Profile Domain -Enabled True</pre>
+<pre><#
+.SYNOPSIS
+    Remediates STIG WN11-CC-000005 - Camera access from the lock screen must be disabled.
+
+.DESCRIPTION
+    STIG ID   : WN11-CC-000005
+    Severity  : CAT II (Medium)
+    CCI       : CCI-000366
+    Rule ID   : SV-253336r958502_rule
+    Vuln ID   : V-253336
+
+    Finding:
+        Allowing camera access from the lock screen could allow unauthorized
+        users to capture images or video without authenticating to the system.
+
+    Required setting:
+        Policy  : Allow use of camera from lock screen
+        Value   : Disabled
+        Registry: HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization
+                  NoLockScreenCamera = 1 (DWORD)
+
+    Group Policy equivalent:
+        Computer Configuration >> Administrative Templates >>
+        Control Panel >> Personalization >>
+        "Prevent enabling lock screen camera" = Enabled
+
+.NOTES
+    - Must be run as Administrator (elevated PowerShell).
+    - Policy is enforced via registry (policy-backed).
+    - On domain-joined systems, domain GPO may override this setting.
+    - No reboot required; may require gpupdate.
+
+.EXAMPLE
+    .\Remediate-WN11-CC-000005.ps1
+#>
+
+#Requires -RunAsAdministrator
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+$StigId      = 'WN11-CC-000005'
+$RegPath     = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization'
+$ValueName   = 'NoLockScreenCamera'
+$RequiredVal = 1
+
+# ── Helper: write a timestamped, coloured status line ─────────────────────────
+function Write-Status {
+    param(
+        [string]$Message,
+        [ValidateSet('Info','Pass','Fail','Action','Warn')]
+        [string]$Level = 'Info'
+    )
+    $colour = switch ($Level) {
+        'Pass'   { 'Green'  }
+        'Fail'   { 'Red'    }
+        'Action' { 'Cyan'   }
+        'Warn'   { 'Yellow' }
+        default  { 'White'  }
+    }
+    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
+}
+
+# ── Helper: get current value ─────────────────────────────────────────────────
+function Get-PolicyValue {
+    if (Test-Path $RegPath) {
+        try {
+            return (Get-ItemProperty -Path $RegPath -Name $ValueName -ErrorAction Stop).$ValueName
+        }
+        catch {
+            return $null
+        }
+    }
+    return $null
+}
+
+# ── Helper: set value ─────────────────────────────────────────────────────────
+function Set-PolicyValue {
+    Write-Status "Applying registry setting..." Action
+
+    if (-not (Test-Path $RegPath)) {
+        Write-Status "Registry path does not exist. Creating..." Action
+        New-Item -Path $RegPath -Force | Out-Null
+    }
+
+    New-ItemProperty -Path $RegPath -Name $ValueName -Value $RequiredVal -PropertyType DWord -Force | Out-Null
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+Write-Status "Starting remediation for $StigId" Info
+Write-Status "Control: Camera access from lock screen must be disabled" Info
+Write-Host   ""
+
+# ── Pre-check ─────────────────────────────────────────────────────────────────
+Write-Status "PRE-CHECK" Info
+
+$currentValue = Get-PolicyValue
+
+if ($null -eq $currentValue) {
+    Write-Status "Registry value not set -- FINDING" Fail
+}
+elseif ($currentValue -ne $RequiredVal) {
+    Write-Status "Registry value = $currentValue (expected $RequiredVal) -- FINDING" Fail
+}
+else {
+    Write-Status "Registry value = $currentValue -- ALREADY COMPLIANT" Pass
+    Write-Host ""
+    Write-Status "No changes required. Exiting." Info
+    exit 0
+}
+
+Write-Host ""
+
+# ── Remediation ───────────────────────────────────────────────────────────────
+Write-Status "REMEDIATION" Action
+
+try {
+    Set-PolicyValue
+    Write-Status "Registry successfully updated." Action
+}
+catch {
+    Write-Status "Failed to apply registry setting: $_" Fail
+    exit 1
+}
+
+Write-Host ""
+
+# ── Post-check / Verification ─────────────────────────────────────────────────
+Write-Status "POST-CHECK / VERIFICATION" Info
+
+Start-Sleep -Seconds 2
+
+$verifyValue = Get-PolicyValue
+
+if ($verifyValue -eq $RequiredVal) {
+    Write-Status "VERIFICATION PASSED: Registry value = $verifyValue -- COMPLIANT" Pass
+}
+else {
+    Write-Status "VERIFICATION FAILED: Registry value = $verifyValue (expected $RequiredVal)" Fail
+    exit 1
+}
+
+Write-Host ""
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Status "Remediation Summary" Info
+Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
+Write-Host   "  Setting   : Lock screen camera access" -ForegroundColor White
+Write-Host   "  Value Set : Disabled (NoLockScreenCamera = 1)" -ForegroundColor White
+Write-Host   "  Method    : Registry (Policy-based)" -ForegroundColor White
+Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
+Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+Write-Host ""
+
+Write-Status "NOTE: Domain GPO may override this setting." Warn
+Write-Status "      Verify in Group Policy if system is domain-joined." Warn
+Write-Host   "      Location: Computer Configuration >> Administrative Templates >>" -ForegroundColor Yellow
+Write-Host   "      Control Panel >> Personalization >>" -ForegroundColor Yellow
+Write-Host   "      'Prevent enabling lock screen camera' = Enabled" -ForegroundColor Yellow
+Write-Host ""
+
+Write-Status "You can also verify with:" Warn
+Write-Host   "      Get-ItemProperty -Path '$RegPath' -Name '$ValueName'" -ForegroundColor Yellow
+Write-Host ""
+
+Write-Status "Remediation complete." Pass
+</pre>
 </div>
 
 <p>Ensures network filtering is enforced on domain networks.</p>
@@ -794,7 +1124,7 @@ Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies
 </pre>
 </div>
 
-<p>Prevents malware execution from USB devices.</p>
+<p>Enabling camera access from the lock screen could allow for unauthorized use. Requiring logon will ensure the device is only used by authorized personnel.</p>
 </div>
 
 <!-- ===================== SCRIPT ===================== -->
