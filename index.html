@@ -1,185 +1,863 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>PowerShell STIG Implementations</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PowerShell STIG Implementations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet">
 
-<style>
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    margin: 0;
-    padding: 40px;
-    background-color: #0d1117;
-    color: #e6edf3;
-}
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Header */
-.header {
-    max-width: 900px;
-    margin: auto;
-    margin-bottom: 40px;
-}
+        :root {
+            --bg:       #0a0c0f;
+            --surface:  #111318;
+            --surface2: #181c23;
+            --border:   #222733;
+            --border2:  #2d3445;
+            --accent:   #4f8ef7;
+            --accent2:  #2d5fc4;
+            --green:    #3ecf8e;
+            --amber:    #f5a623;
+            --red:      #e05a5a;
+            --text:     #dde3f0;
+            --muted:    #7a879e;
+            --code-bg:  #0d1017;
+            --tag-bg:   #1a2035;
+            --tag-text: #6b8ccc;
+        }
 
-h1 {
-    color: #58a6ff;
-    margin-bottom: 5px;
-}
+        body {
+            font-family: 'Syne', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 0;
+            line-height: 1.6;
+        }
 
-.subtitle {
-    color: #8b949e;
-}
+        /* ── Header ── */
+        header {
+            border-bottom: 1px solid var(--border);
+            padding: 2.5rem 2rem 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
 
-/* Card */
-.card {
-    max-width: 900px;
-    margin: 20px auto;
-    padding: 18px;
-    border: 1px solid #30363d;
-    border-radius: 12px;
-    background: #161b22;
-    transition: 0.2s ease;
-}
+        .header-eyebrow {
+            font-size: 11px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 0.6rem;
+        }
 
-.card:hover {
-    border-color: #58a6ff;
-    box-shadow: 0 0 10px rgba(88,166,255,0.1);
-}
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #eef1f8;
+            line-height: 1.2;
+            margin-bottom: 0.6rem;
+        }
 
-/* Title */
-.card h2 {
-    margin: 0 0 6px;
-    color: #58a6ff;
-    font-size: 18px;
-}
+        header p {
+            font-size: 14px;
+            color: var(--muted);
+            max-width: 520px;
+        }
 
-.card p {
-    color: #c9d1d9;
-    font-size: 14px;
-}
+        .header-meta {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.4rem;
+            flex-wrap: wrap;
+        }
 
-/* Expandable */
-details {
-    margin-top: 10px;
-}
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--tag-bg);
+            color: var(--tag-text);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border2);
+        }
 
-summary {
-    cursor: pointer;
-    font-size: 13px;
-    color: #8b949e;
-    margin-bottom: 8px;
-}
+        .badge.green { background: #0d2318; color: var(--green); border-color: #1a4030; }
+        .badge.amber { background: #231a0b; color: var(--amber); border-color: #3d2e10; }
 
-summary:hover {
-    color: #58a6ff;
-}
+        /* ── Main layout ── */
+        main {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 2rem 4rem;
+        }
 
-/* Code block */
-.code-container {
-    position: relative;
-}
+        /* ── STIG card ── */
+        .stig {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
 
-pre {
-    margin: 0;
-    padding: 12px;
-    font-size: 11px;
-    line-height: 1.4;
-    background: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 8px;
-    overflow-x: auto;
-    max-height: 250px;
-}
+        .stig:hover {
+            border-color: var(--border2);
+        }
 
-/* Copy button */
-.copy-btn {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: #238636;
-    border: none;
-    color: white;
-    padding: 5px 10px;
-    font-size: 11px;
-    border-radius: 6px;
-    cursor: pointer;
-}
+        /* ── Card header (always visible) ── */
+        .stig-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 13px 16px;
+            background: var(--surface);
+            cursor: pointer;
+            user-select: none;
+            gap: 14px;
+        }
 
-.copy-btn:hover {
-    background: #2ea043;
-}
-</style>
+        .stig-header:hover {
+            background: var(--surface2);
+        }
+
+        .stig-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11.5px;
+            font-weight: 500;
+            color: var(--accent);
+            white-space: nowrap;
+            background: #0f1a30;
+            border: 1px solid #1e3060;
+            padding: 3px 8px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .stig-title {
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--text);
+            flex: 1;
+            line-height: 1.4;
+        }
+
+        .severity-pill {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .sev-high   { background: #2a0f0f; color: var(--red);   border: 1px solid #4a1a1a; }
+        .sev-medium { background: #231a0b; color: var(--amber); border: 1px solid #3d2e10; }
+        .sev-low    { background: #0d2318; color: var(--green); border: 1px solid #1a4030; }
+
+        .chevron {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            color: var(--muted);
+            transition: transform 0.2s;
+        }
+
+        .stig.open .chevron {
+            transform: rotate(180deg);
+        }
+
+        /* ── Card body (collapsible) ── */
+        .stig-body {
+            display: none;
+            border-top: 1px solid var(--border);
+        }
+
+        .stig.open .stig-body {
+            display: block;
+        }
+
+        .stig-desc {
+            padding: 12px 16px 10px;
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.6;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* ── Code block ── */
+        .code-wrap {
+            position: relative;
+            background: var(--code-bg);
+        }
+
+        .code-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 14px;
+            background: #0d1017;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .code-lang {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10.5px;
+            color: var(--muted);
+            letter-spacing: 0.05em;
+        }
+
+        .copy-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: transparent;
+            border: 1px solid var(--border2);
+            color: var(--muted);
+            font-family: 'Syne', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+
+        .copy-btn:hover {
+            background: var(--surface2);
+            color: var(--text);
+            border-color: var(--accent);
+        }
+
+        .copy-btn.copied {
+            color: var(--green);
+            border-color: var(--green);
+        }
+
+        pre {
+            margin: 0;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11.5px;
+            line-height: 1.7;
+            background: var(--code-bg);
+            overflow-x: auto;
+            white-space: pre;
+            color: #c9d9f0;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        pre::-webkit-scrollbar { width: 6px; height: 6px; }
+        pre::-webkit-scrollbar-track { background: transparent; }
+        pre::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+        /* ── Syntax-ish coloring ── */
+        pre .cm  { color: #5a6a8a; font-style: italic; }  /* comments */
+        pre .kw  { color: #7fb2ff; }                       /* keywords */
+        pre .str { color: #89d97a; }                       /* strings */
+        pre .var { color: #e8b96a; }                       /* variables */
+        pre .fn  { color: #c792ea; }                       /* functions */
+        pre .num { color: #f07d7a; }                       /* numbers */
+
+        /* ── Footer ── */
+        footer {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        @media (max-width: 600px) {
+            header h1 { font-size: 1.5rem; }
+            .stig-title { font-size: 12.5px; }
+            pre { font-size: 10.5px; }
+        }
+    </style>
 </head>
-
 <body>
 
-<div class="header">
+<header>
+    <div class="header-eyebrow">Windows 11 Hardening</div>
     <h1>PowerShell STIG Implementations</h1>
-    <p class="subtitle">
-        Windows hardening scripts for STIG compliance and security automation.
-    </p>
-</div>
+    <p>Remediation scripts for Windows 11 DISA STIG compliance. Each script is idempotent, validated, and ready to deploy.</p>
+    <div class="header-meta">
+        <span class="badge">10 Controls</span>
+        <span class="badge green">Windows 11</span>
+        <span class="badge amber">Run as Administrator</span>
+    </div>
+</header>
 
-<!-- Example Card -->
-<div class="card">
-    <h2>WN11-CC-000305</h2>
-    <p>Disable indexing of encrypted files to prevent data exposure.</p>
+<main>
 
-    <details>
-        <summary>View Script</summary>
+    <!-- ── STIG 1 ── -->
+    <div class="stig" onclick="toggle(this)">
+        <div class="stig-header">
+            <span class="stig-id">WN11-CC-000305</span>
+            <span class="stig-title">Indexing of encrypted files must be turned off</span>
+            <span class="severity-pill sev-medium">Medium</span>
+            <svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4,6 8,10 12,6"/>
+            </svg>
+        </div>
+        <div class="stig-body">
+            <p class="stig-desc">Indexing of encrypted files may expose sensitive data. This setting prevents encrypted files from being indexed by Windows Search.</p>
+            <div class="code-wrap">
+                <div class="code-toolbar">
+                    <span class="code-lang">PowerShell</span>
+                    <button class="copy-btn" onclick="copyCode(event, this)">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1"/></svg>
+                        Copy
+                    </button>
+                </div>
+<pre><#
+.SYNOPSIS  Remediates STIG WN11-CC-000305 — Disable indexing of encrypted files
+.NOTES     Run as Administrator
+#>
 
-        <div class="code-container">
-            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+Write-Host "Applying STIG WN11-CC-000305..." -ForegroundColor Cyan
 
-<pre>
-# Disable indexing of encrypted files
 $Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search"
 
-if (-not (Test-Path $Path)) {
-    New-Item -Path $Path -Force | Out-Null
-}
+if (-not (Test-Path $Path)) { New-Item -Path $Path -Force | Out-Null }
 
 New-ItemProperty -Path $Path `
     -Name "AllowIndexingEncryptedStoresOrItems" `
-    -PropertyType DWord `
-    -Value 0 `
-    -Force | Out-Null
-</pre>
+    -PropertyType DWord -Value 0 -Force | Out-Null
 
+Restart-Service -Name "WSearch" -Force -ErrorAction SilentlyContinue
+
+$result = Get-ItemProperty -Path $Path -Name "AllowIndexingEncryptedStoresOrItems" -ErrorAction SilentlyContinue
+
+if ($result.AllowIndexingEncryptedStoresOrItems -eq 0) {
+    Write-Host "STIG WN11-CC-000305 successfully remediated." -ForegroundColor Green
+} else {
+    Write-Host "Remediation FAILED." -ForegroundColor Red
+}</pre>
+            </div>
         </div>
-    </details>
-</div>
+    </div>
 
-<!-- Duplicate this block for other STIGs -->
-<div class="card">
-    <h2>WN11-00-000160</h2>
-    <p>Disable SMBv1 (legacy insecure protocol).</p>
-
-    <details>
-        <summary>View Script</summary>
-
-        <div class="code-container">
-            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-
-<pre>
-Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart
-
-Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" `
-    -Name SMB1 -Value 0 -Type DWord
-</pre>
-
+    <!-- ── STIG 2 ── -->
+    <div class="stig" onclick="toggle(this)">
+        <div class="stig-header">
+            <span class="stig-id">WN11-CC-000252</span>
+            <span class="stig-title">Windows Game Recording and Broadcasting must be disabled</span>
+            <span class="severity-pill sev-medium">Medium</span>
+            <svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4,6 8,10 12,6"/>
+            </svg>
         </div>
-    </details>
-</div>
+        <div class="stig-body">
+            <p class="stig-desc">Game Recording could capture and expose sensitive data from other applications. Disabling it prevents inadvertent screen capture.</p>
+            <div class="code-wrap">
+                <div class="code-toolbar">
+                    <span class="code-lang">PowerShell</span>
+                    <button class="copy-btn" onclick="copyCode(event, this)">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1"/></svg>
+                        Copy
+                    </button>
+                </div>
+<pre><#
+.SYNOPSIS  Remediates STIG WN11-CC-000252 — Disable Windows Game Recording and Broadcasting
+.NOTES     Run as Administrator
+#>
+
+Write-Host "Applying STIG WN11-CC-000252..." -ForegroundColor Cyan
+
+$Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR"
+if (-not (Test-Path $Path)) { New-Item -Path $Path -Force | Out-Null }
+
+New-ItemProperty -Path $Path -Name "AllowGameDVR" -PropertyType DWord -Value 0 -Force | Out-Null
+
+$UserPath = "HKCU:\System\GameConfigStore"
+if (-not (Test-Path $UserPath)) { New-Item -Path $UserPath -Force | Out-Null }
+
+New-ItemProperty -Path $UserPath -Name "GameDVR_Enabled" -PropertyType DWord -Value 0 -Force | Out-Null
+
+$check1 = Get-ItemProperty -Path $Path     -Name "AllowGameDVR"    -ErrorAction SilentlyContinue
+$check2 = Get-ItemProperty -Path $UserPath -Name "GameDVR_Enabled" -ErrorAction SilentlyContinue
+
+if ($check1.AllowGameDVR -eq 0 -and $check2.GameDVR_Enabled -eq 0) {
+    Write-Host "STIG WN11-CC-000252 successfully remediated." -ForegroundColor Green
+} else {
+    Write-Host "Remediation FAILED or incomplete." -ForegroundColor Red
+}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STIG 3 ── -->
+    <div class="stig" onclick="toggle(this)">
+        <div class="stig-header">
+            <span class="stig-id">WN11-CC-000326</span>
+            <span class="stig-title">PowerShell script block logging must be enabled</span>
+            <span class="severity-pill sev-medium">Medium</span>
+            <svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4,6 8,10 12,6"/>
+            </svg>
+        </div>
+        <div class="stig-body">
+            <p class="stig-desc">Script block logging records detailed PowerShell execution data, enabling audit trail analysis and malware detection. Module logging is also enabled for SIEM correlation.</p>
+            <div class="code-wrap">
+                <div class="code-toolbar">
+                    <span class="code-lang">PowerShell</span>
+                    <button class="copy-btn" onclick="copyCode(event, this)">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1"/></svg>
+                        Copy
+                    </button>
+                </div>
+<pre><#
+.SYNOPSIS  Remediates STIG WN11-CC-000326 — Enable PowerShell Script Block Logging
+.NOTES     Run as Administrator
+#>
+
+Write-Host "Applying STIG WN11-CC-000326..." -ForegroundColor Cyan
+
+$Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging"
+if (-not (Test-Path $Path)) { New-Item -Path $Path -Force | Out-Null }
+
+New-ItemProperty -Path $Path -Name "EnableScriptBlockLogging" -PropertyType DWord -Value 1 -Force | Out-Null
+
+# Enable module logging (recommended for SIEM correlation)
+$ModulePath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging"
+if (-not (Test-Path $ModulePath)) { New-Item -Path $ModulePath -Force | Out-Null }
+
+New-ItemProperty -Path $ModulePath -Name "EnableModuleLogging" -PropertyType DWord -Value 1 -Force | Out-Null
+
+$ModuleNamesPath = "$ModulePath\ModuleNames"
+if (-not (Test-Path $ModuleNamesPath)) { New-Item -Path $ModuleNamesPath -Force | Out-Null }
+
+New-ItemProperty -Path $ModuleNamesPath -Name "*" -PropertyType String -Value "*" -Force | Out-Null
+
+$check = Get-ItemProperty -Path $Path -Name "EnableScriptBlockLogging" -ErrorAction SilentlyContinue
+
+if ($check.EnableScriptBlockLogging -eq 1) {
+    Write-Host "STIG WN11-CC-000326 successfully remediated." -ForegroundColor Green
+} else {
+    Write-Host "Remediation FAILED." -ForegroundColor Red
+}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STIG 4 ── -->
+    <div class="stig" onclick="toggle(this)">
+        <div class="stig-header">
+            <span class="stig-id">WN11-00-000160</span>
+            <span class="stig-title">SMBv1 protocol must be disabled</span>
+            <span class="severity-pill sev-high">High</span>
+            <svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4,6 8,10 12,6"/>
+            </svg>
+        </div>
+        <div class="stig-body">
+            <p class="stig-desc">SMBv1 uses the MD5 algorithm and is vulnerable to collision and preimage attacks. It is not FIPS compliant. Disabling it may affect legacy NAS devices or Windows Server 2003 shares (no longer supported). A reboot may be required.</p>
+            <div class="code-wrap">
+                <div class="code-toolbar">
+                    <span class="code-lang">PowerShell</span>
+                    <button class="copy-btn" onclick="copyCode(event, this)">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1"/></svg>
+                        Copy
+                    </button>
+                </div>
+<pre><#
+.SYNOPSIS  Remediates STIG WN11-00-000160 — Disable SMBv1
+.NOTES     Date: 2026-05-03 | STIG ID: WN11-00-000160
+#>
+
+Write-Host "Checking SMBv1 status..." -ForegroundColor Cyan
+
+Try {
+    Disable-WindowsOptionalFeature -Online -FeatureName "SMB1Protocol" -NoRestart -ErrorAction Stop
+    Write-Host "SMBv1 Windows Feature disabled." -ForegroundColor Green
+} Catch {
+    Write-Host "SMBv1 feature may already be disabled or absent." -ForegroundColor Yellow
+}
+
+$regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters"
+if (!(Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+
+New-ItemProperty -Path $regPath -Name "SMB1" -PropertyType DWORD -Value 0 -Force | Out-Null
+Write-Host "Registry enforcement applied." -ForegroundColor Green
+
+Get-WindowsOptionalFeature -Online -FeatureName "SMB1Protocol"
+Write-Host "Reboot may be required for full effect." -ForegroundColor Green</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STIG 5 ── -->
+    <div class="stig" onclick="toggle(this)">
+        <div class="stig-header">
+            <span class="stig-id">WN11-CC-000315</span>
+            <span class="stig-title">Windows Installer must not always install with elevated privileges</span>
+            <span class="severity-pill sev-high">High — CAT I</span>
+            <svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4,6 8,10 12,6"/>
+            </svg>
+        </div>
+        <div class="stig-body">
+            <p class="stig-desc">AlwaysInstallElevated allows non-admin users to install software with SYSTEM-level privileges — a critical privilege escalation vector. Must be disabled in both HKLM and HKCU hives.</p>
+            <div class="code-wrap">
+                <div class="code-toolbar">
+                    <span class="code-lang">PowerShell</span>
+                    <button class="copy-btn" onclick="copyCode(event, this)">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1"/></svg>
+                        Copy
+                    </button>
+                </div>
+<pre><#
+.SYNOPSIS  Remediates STIG WN11-CC-000315 — Disable AlwaysInstallElevated
+.NOTES     Severity: CAT I (High) | Must run as Administrator
+#>
+
+#Requires -RunAsAdministrator
+
+$HKLMPath  = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Installer"
+$HKCUPath  = "HKCU:\SOFTWARE\Policies\Microsoft\Windows\Installer"
+$ValueName = "AlwaysInstallElevated"
+
+foreach ($Path in @($HKLMPath, $HKCUPath)) {
+    if (-Not (Test-Path $Path)) { New-Item -Path $Path -Force | Out-Null }
+    Set-ItemProperty -Path $Path -Name $ValueName -Value 0 -Type DWord -Force
+    Write-Host "Set $Path\$ValueName = 0" -ForegroundColor Green
+}
+
+$hklmVal = (Get-ItemProperty -Path $HKLMPath -Name $ValueName -ErrorAction SilentlyContinue).$ValueName
+$hkcuVal = (Get-ItemProperty -Path $HKCUPath -Name $ValueName -ErrorAction SilentlyContinue).$ValueName
+
+if ($hklmVal -eq 0 -and $hkcuVal -eq 0) {
+    Write-Host "[PASS] WN11-CC-000315 remediation successful." -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] Review values above." -ForegroundColor Red
+}
+
+Write-Host "Run 'gpupdate /force' to apply Group Policy changes." -ForegroundColor Cyan</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STIG 6 ── -->
+    <div class="stig" onclick="toggle(this)">
+        <div class="stig-header">
+            <span class="stig-id">WN11-CC-000345</span>
+            <span class="stig-title">WinRM service must not use Basic authentication</span>
+            <span class="severity-pill sev-high">High</span>
+            <svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4,6 8,10 12,6"/>
+            </svg>
+        </div>
+        <div class="stig-body">
+            <p class="stig-desc">Basic authentication transmits credentials in plain text, making them trivially interceptable. This script disables Basic auth for both the WinRM service and client via Group Policy registry and WinRM configuration layers.</p>
+            <div class="code-wrap">
+                <div class="code-toolbar">
+                    <span class="code-lang">PowerShell</span>
+                    <button class="copy-btn" onclick="copyCode(event, this)">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1"/></svg>
+                        Copy
+                    </button>
+                </div>
+<pre><#
+.SYNOPSIS  Remediates STIG WN11-CC-000345 — Disable WinRM Basic Authentication
+.NOTES     Date: 2026-05-03
+#>
+
+Write-Host "Disabling WinRM Basic Authentication..." -ForegroundColor Cyan
+
+foreach ($scope in @("Service", "Client")) {
+    $regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WinRM\$scope"
+    if (!(Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+    New-ItemProperty -Path $regPath -Name "AllowBasic" -PropertyType DWord -Value 0 -Force | Out-Null
+    Write-Host "WinRM $scope Basic Auth disabled via policy." -ForegroundColor Green
+}
+
+Try {
+    winrm set winrm/config/service/auth "@{Basic=`"false`"}" | Out-Null
+    winrm set winrm/config/client/auth "@{Basic=`"false`"}" | Out-Null
+    Write-Host "WinRM config updated." -ForegroundColor Green
+} Catch {
+    Write-Host "WinRM config update skipped (already enforced by policy)." -ForegroundColor Yellow
+}
+
+Write-Host "`nService Auth:" -ForegroundColor Cyan; winrm get winrm/config/service/auth
+Write-Host "`nClient Auth:"  -ForegroundColor Cyan; winrm get winrm/config/client/auth
+Write-Host "Restart WinRM service if required." -ForegroundColor Green</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STIG 7 ── -->
+    <div class="stig" onclick="toggle(this)">
+        <div class="stig-header">
+            <span class="stig-id">WN11-AC-000010</span>
+            <span class="stig-title">Account lockout threshold must be 3 or fewer invalid logon attempts</span>
+            <span class="severity-pill sev-medium">Medium — CAT II</span>
+            <svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4,6 8,10 12,6"/>
+            </svg>
+        </div>
+        <div class="stig-body">
+            <p class="stig-desc">A threshold of 0 disables lockout entirely; values above 3 provide insufficient brute-force protection. Applies via secedit (Local Security Policy). On domain-joined systems, verify the domain GPO is also compliant — it may override local policy.</p>
+            <div class="code-wrap">
+                <div class="code-toolbar">
+                    <span class="code-lang">PowerShell</span>
+                    <button class="copy-btn" onclick="copyCode(event, this)">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1"/></svg>
+                        Copy
+                    </button>
+                </div>
+<pre><#
+.SYNOPSIS  Remediates STIG WN11-AC-000010 — Account lockout threshold (max 3 attempts)
+.NOTES     CCI: CCI-000044 | Must run as Administrator | No reboot required
+#>
+
+#Requires -RunAsAdministrator
+
+$RequiredThreshold = 3  # Adjust to 1 or 2 for stricter posture
+
+function Get-LockoutThreshold {
+    $line = (net accounts 2>&1) | Where-Object { $_ -match 'Lockout threshold' }
+    if ($line -match ':\s*(\S+)') {
+        $raw = $Matches[1].Trim()
+        return ($raw -ieq 'Never') ? 0 : [int]$raw
+    }
+    return $null
+}
+
+function Set-LockoutThreshold([int]$Threshold) {
+    $cfg = Join-Path $env:TEMP 'stig_ac000010.inf'
+    $db  = Join-Path $env:TEMP 'stig_ac000010.sdb'
+    $log = Join-Path $env:TEMP 'stig_ac000010.log'
+
+    @"
+[Unicode]
+Unicode=yes
+[System Access]
+LockoutBadCount = $Threshold
+[Version]
+signature="`$CHICAGO`$"
+Revision=1
+"@ | Set-Content -Path $cfg -Encoding Unicode
+
+    secedit /configure /db $db /cfg $cfg /log $log /quiet 2>&1 | Out-Null
+    Remove-Item $cfg, $db, $log -ErrorAction SilentlyContinue
+}
+
+$current = Get-LockoutThreshold
+Write-Host "Current threshold: $current"
+
+if ($current -ge 1 -and $current -le $RequiredThreshold) {
+    Write-Host "[PASS] Already compliant." -ForegroundColor Green; exit 0
+}
+
+Set-LockoutThreshold -Threshold $RequiredThreshold
+Start-Sleep -Seconds 2
+
+$verified = Get-LockoutThreshold
+if ($verified -ge 1 -and $verified -le $RequiredThreshold) {
+    Write-Host "[PASS] Threshold = $verified — compliant." -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] Threshold = $verified — check domain GPO override." -ForegroundColor Red
+    exit 1
+}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STIG 8 ── -->
+    <div class="stig" onclick="toggle(this)">
+        <div class="stig-header">
+            <span class="stig-id">WN11-CC-000280</span>
+            <span class="stig-title">Remote Desktop Services must always prompt for passwords upon connection</span>
+            <span class="severity-pill sev-medium">Medium</span>
+            <svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4,6 8,10 12,6"/>
+            </svg>
+        </div>
+        <div class="stig-body">
+            <p class="stig-desc">Without this setting, stored credentials in an RDP connection file can be used to silently authenticate to a session — bypassing authentication entirely. A reboot or gpupdate may be required.</p>
+            <div class="code-wrap">
+                <div class="code-toolbar">
+                    <span class="code-lang">PowerShell</span>
+                    <button class="copy-btn" onclick="copyCode(event, this)">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1"/></svg>
+                        Copy
+                    </button>
+                </div>
+<pre><#
+.SYNOPSIS  Remediates STIG WN11-CC-000280 — RDP must always prompt for password
+.NOTES     Date: 2026-05-03 | STIG ID: WN11-CC-000280
+#>
+
+Write-Host "Configuring RDP password prompt policy..." -ForegroundColor Cyan
+
+$regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"
+if (!(Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+
+New-ItemProperty -Path $regPath -Name "fPromptForPassword" -PropertyType DWord -Value 1 -Force | Out-Null
+
+$value = (Get-ItemProperty -Path $regPath -Name "fPromptForPassword" -ErrorAction SilentlyContinue).fPromptForPassword
+
+if ($value -eq 1) {
+    Write-Host "[PASS] WN11-CC-000280 — Compliant." -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] Setting not applied correctly." -ForegroundColor Red
+}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STIG 9 ── -->
+    <div class="stig" onclick="toggle(this)">
+        <div class="stig-header">
+            <span class="stig-id">WN11-CC-000005</span>
+            <span class="stig-title">Camera access from the lock screen must be disabled</span>
+            <span class="severity-pill sev-medium">Medium — CAT II</span>
+            <svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4,6 8,10 12,6"/>
+            </svg>
+        </div>
+        <div class="stig-body">
+            <p class="stig-desc">Allowing camera access from the lock screen permits unauthorized video/image capture without system authentication. CCI: CCI-000366. No reboot required; may need gpupdate on domain-joined systems.</p>
+            <div class="code-wrap">
+                <div class="code-toolbar">
+                    <span class="code-lang">PowerShell</span>
+                    <button class="copy-btn" onclick="copyCode(event, this)">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1"/></svg>
+                        Copy
+                    </button>
+                </div>
+<pre><#
+.SYNOPSIS  Remediates STIG WN11-CC-000005 — Disable lock screen camera access
+.NOTES     CCI: CCI-000366 | Must run as Administrator
+#>
+
+#Requires -RunAsAdministrator
+
+$RegPath     = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization'
+$ValueName   = 'NoLockScreenCamera'
+$RequiredVal = 1
+
+$current = try {
+    (Get-ItemProperty -Path $RegPath -Name $ValueName -ErrorAction Stop).$ValueName
+} catch { $null }
+
+if ($current -eq $RequiredVal) {
+    Write-Host "[PASS] Already compliant — no changes required." -ForegroundColor Green
+    exit 0
+}
+
+if (-not (Test-Path $RegPath)) { New-Item -Path $RegPath -Force | Out-Null }
+
+New-ItemProperty -Path $RegPath -Name $ValueName -Value $RequiredVal -PropertyType DWord -Force | Out-Null
+
+$verify = (Get-ItemProperty -Path $RegPath -Name $ValueName -ErrorAction SilentlyContinue).$ValueName
+
+if ($verify -eq $RequiredVal) {
+    Write-Host "[PASS] WN11-CC-000005 — Compliant. (NoLockScreenCamera = 1)" -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] Registry value not applied correctly." -ForegroundColor Red
+    exit 1
+}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STIG 10 ── -->
+    <div class="stig" onclick="toggle(this)">
+        <div class="stig-header">
+            <span class="stig-id">WN11-CC-000185</span>
+            <span class="stig-title">Default autorun behavior must be configured to prevent autorun commands</span>
+            <span class="severity-pill sev-medium">Medium</span>
+            <svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4,6 8,10 12,6"/>
+            </svg>
+        </div>
+        <div class="stig-body">
+            <p class="stig-desc">Autorun commands on removable media are a common malware delivery vector. This script disables autorun across all drive types and fully disables Autoplay via Group Policy registry settings.</p>
+            <div class="code-wrap">
+                <div class="code-toolbar">
+                    <span class="code-lang">PowerShell</span>
+                    <button class="copy-btn" onclick="copyCode(event, this)">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1"/></svg>
+                        Copy
+                    </button>
+                </div>
+<pre><#
+.SYNOPSIS  Remediates STIG WN11-CC-000185 — Disable Autorun commands
+.NOTES     Run as Administrator
+#>
+
+Write-Host "Applying STIG WN11-CC-000185..." -ForegroundColor Cyan
+
+$Path = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer"
+if (-not (Test-Path $Path)) { New-Item -Path $Path -Force | Out-Null }
+
+# Disable Autorun for all drive types (0xFF = 255 = all drives)
+New-ItemProperty -Path $Path -Name "NoDriveTypeAutoRun" -PropertyType DWord -Value 255 -Force | Out-Null
+New-ItemProperty -Path $Path -Name "NoAutorun"          -PropertyType DWord -Value 1   -Force | Out-Null
+
+# Disable Autoplay for non-volume devices via policy
+$PolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Explorer"
+if (-not (Test-Path $PolicyPath)) { New-Item -Path $PolicyPath -Force | Out-Null }
+
+New-ItemProperty -Path $PolicyPath -Name "NoAutoplayfornonVolume" -PropertyType DWord -Value 1 -Force | Out-Null
+
+$result = (Get-ItemProperty -Path $Path -Name "NoDriveTypeAutoRun" -ErrorAction SilentlyContinue).NoDriveTypeAutoRun
+
+if ($result -eq 255) {
+    Write-Host "[PASS] WN11-CC-000185 successfully remediated." -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] Remediation incomplete." -ForegroundColor Red
+}</pre>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<footer>
+    <span>Windows 11 STIG Compliance &mdash; PowerShell Remediation Scripts</span>
+    <span>DISA STIG &middot; 2026</span>
+</footer>
 
 <script>
-function copyCode(button) {
-    const code = button.nextElementSibling.innerText;
+    function toggle(el) {
+        el.classList.toggle('open');
+    }
 
-    navigator.clipboard.writeText(code).then(() => {
-        button.innerText = "Copied!";
-        setTimeout(() => button.innerText = "Copy", 1500);
-    });
-}
+    function copyCode(event, btn) {
+        event.stopPropagation();
+        const pre = btn.closest('.code-wrap').querySelector('pre');
+        navigator.clipboard.writeText(pre.innerText.trim()).then(() => {
+            btn.classList.add('copied');
+            btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,8 6,12 14,4"/></svg> Copied`;
+            setTimeout(() => {
+                btn.classList.remove('copied');
+                btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1"/></svg> Copy`;
+            }, 2000);
+        });
+    }
 </script>
 
 </body>
