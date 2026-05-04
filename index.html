@@ -331,7 +331,16 @@
                 </div>
 <pre><#
 .SYNOPSIS  Remediates STIG WN11-CC-000305 — Disable indexing of encrypted files
-.NOTES     Run as Administrator
+.NOTES
+    Author          : Matt McClintock
+    LinkedIn        : linkedin.com/in/mmcclin97/
+    GitHub          : github.com/Matt-Hax
+    Date Created    : 05-03-2026
+    Last Modified   : 05-03-2026
+    Version         : 1.0
+    CVEs            : N/A
+    Plugin IDs      : N/A
+    STIG-ID         : WN11-CC-000305
 #>
 
 Write-Host "Applying STIG WN11-CC-000305..." -ForegroundColor Cyan
@@ -379,7 +388,16 @@ if ($result.AllowIndexingEncryptedStoresOrItems -eq 0) {
                 </div>
 <pre><#
 .SYNOPSIS  Remediates STIG WN11-CC-000252 — Disable Windows Game Recording and Broadcasting
-.NOTES     Run as Administrator
+.NOTES
+    Author          : Matt McClintock
+    LinkedIn        : linkedin.com/in/mmcclin97/
+    GitHub          : github.com/Matt-Hax
+    Date Created    : 05-03-2026
+    Last Modified   : 05-03-2026
+    Version         : 1.0
+    CVEs            : N/A
+    Plugin IDs      : N/A
+    STIG-ID         : WN11-CC-000252
 #>
 
 Write-Host "Applying STIG WN11-CC-000252..." -ForegroundColor Cyan
@@ -428,7 +446,16 @@ if ($check1.AllowGameDVR -eq 0 -and $check2.GameDVR_Enabled -eq 0) {
                 </div>
 <pre><#
 .SYNOPSIS  Remediates STIG WN11-CC-000326 — Enable PowerShell Script Block Logging
-.NOTES     Run as Administrator
+.NOTES
+    Author          : Matt McClintock
+    LinkedIn        : linkedin.com/in/mmcclin97/
+    GitHub          : github.com/Matt-Hax
+    Date Created    : 05-03-2026
+    Last Modified   : 05-03-2026
+    Version         : 1.0
+    CVEs            : N/A
+    Plugin IDs      : N/A
+    STIG-ID         : WN11-CC-000326
 #>
 
 Write-Host "Applying STIG WN11-CC-000326..." -ForegroundColor Cyan
@@ -482,7 +509,16 @@ if ($check.EnableScriptBlockLogging -eq 1) {
                 </div>
 <pre><#
 .SYNOPSIS  Remediates STIG WN11-00-000160 — Disable SMBv1
-.NOTES     Date: 2026-05-03 | STIG ID: WN11-00-000160
+.NOTES
+    Author          : Matt McClintock
+    LinkedIn        : linkedin.com/in/mmcclin97/
+    GitHub          : github.com/Matt-Hax
+    Date Created    : 05-03-2026
+    Last Modified   : 05-03-2026
+    Version         : 1.0
+    CVEs            : N/A
+    Plugin IDs      : N/A
+    STIG-ID         : WN11-00-000160
 #>
 
 Write-Host "Checking SMBv1 status..." -ForegroundColor Cyan
@@ -528,7 +564,16 @@ Write-Host "Reboot may be required for full effect." -ForegroundColor Green</pre
                 </div>
 <pre><#
 .SYNOPSIS  Remediates STIG WN11-CC-000315 — Disable AlwaysInstallElevated
-.NOTES     Severity: CAT I (High) | Must run as Administrator
+.NOTES
+    Author          : Matt McClintock
+    LinkedIn        : linkedin.com/in/mmcclin97/
+    GitHub          : github.com/Matt-Hax
+    Date Created    : 05-03-2026
+    Last Modified   : 05-03-2026
+    Version         : 1.0
+    CVEs            : N/A
+    Plugin IDs      : N/A
+    STIG-ID         : WN11-CC-000315
 #>
 
 #Requires -RunAsAdministrator
@@ -579,7 +624,16 @@ Write-Host "Run 'gpupdate /force' to apply Group Policy changes." -ForegroundCol
                 </div>
 <pre><#
 .SYNOPSIS  Remediates STIG WN11-CC-000345 — Disable WinRM Basic Authentication
-.NOTES     Date: 2026-05-03
+.NOTES
+    Author          : Matt McClintock
+    LinkedIn        : linkedin.com/in/mmcclin97/
+    GitHub          : github.com/Matt-Hax
+    Date Created    : 05-03-2026
+    Last Modified   : 05-03-2026
+    Version         : 1.0
+    CVEs            : N/A
+    Plugin IDs      : N/A
+    STIG-ID         : WN11-CC-000345
 #>
 
 Write-Host "Disabling WinRM Basic Authentication..." -ForegroundColor Cyan
@@ -628,7 +682,16 @@ Write-Host "Restart WinRM service if required." -ForegroundColor Green</pre>
                 </div>
 <pre><#
 .SYNOPSIS  Remediates STIG WN11-AC-000010 — Account lockout threshold (max 3 attempts)
-.NOTES     CCI: CCI-000044 | Must run as Administrator | No reboot required
+.NOTES
+    Author          : Matt McClintock
+    LinkedIn        : linkedin.com/in/mmcclin97/
+    GitHub          : github.com/Matt-Hax
+    Date Created    : 05-03-2026
+    Last Modified   : 05-03-2026
+    Version         : 1.0
+    CVEs            : N/A
+    Plugin IDs      : N/A
+    STIG-ID         : WN11-AC-000010
 #>
 
 #Requires -RunAsAdministrator
@@ -706,7 +769,16 @@ if ($verified -ge 1 -and $verified -le $RequiredThreshold) {
                 </div>
 <pre><#
 .SYNOPSIS  Remediates STIG WN11-CC-000280 — RDP must always prompt for password
-.NOTES     Date: 2026-05-03 | STIG ID: WN11-CC-000280
+.NOTES
+    Author          : Matt McClintock
+    LinkedIn        : linkedin.com/in/mmcclin97/
+    GitHub          : github.com/Matt-Hax
+    Date Created    : 05-03-2026
+    Last Modified   : 05-03-2026
+    Version         : 1.0
+    CVEs            : N/A
+    Plugin IDs      : N/A
+    STIG-ID         : WN11-CC-000280
 #>
 
 Write-Host "Configuring RDP password prompt policy..." -ForegroundColor Cyan
@@ -749,7 +821,16 @@ if ($value -eq 1) {
                 </div>
 <pre><#
 .SYNOPSIS  Remediates STIG WN11-CC-000005 — Disable lock screen camera access
-.NOTES     CCI: CCI-000366 | Must run as Administrator
+.NOTES
+    Author          : Matt McClintock
+    LinkedIn        : linkedin.com/in/mmcclin97/
+    GitHub          : github.com/Matt-Hax
+    Date Created    : 05-03-2026
+    Last Modified   : 05-03-2026
+    Version         : 1.0
+    CVEs            : N/A
+    Plugin IDs      : N/A
+    STIG-ID         : WN11-CC-000005
 #>
 
 #Requires -RunAsAdministrator
@@ -805,7 +886,16 @@ if ($verify -eq $RequiredVal) {
                 </div>
 <pre><#
 .SYNOPSIS  Remediates STIG WN11-CC-000185 — Disable Autorun commands
-.NOTES     Run as Administrator
+.NOTES
+    Author          : Matt McClintock
+    LinkedIn        : linkedin.com/in/mmcclin97/
+    GitHub          : github.com/Matt-Hax
+    Date Created    : 05-03-2026
+    Last Modified   : 05-03-2026
+    Version         : 1.0
+    CVEs            : N/A
+    Plugin IDs      : N/A
+    STIG-ID         : WN11-CC-000185
 #>
 
 Write-Host "Applying STIG WN11-CC-000185..." -ForegroundColor Cyan
