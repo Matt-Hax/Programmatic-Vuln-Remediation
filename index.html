@@ -1,1086 +1,183 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>PowerShell STIG Implementations</title>
+<meta charset="UTF-8">
+<title>PowerShell STIG Implementations</title>
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 40px;
-            background-color: #0d1117;
-            color: #e6edf3;
-        }
+<style>
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 40px;
+    background-color: #0d1117;
+    color: #e6edf3;
+}
 
-        h1 {
-            color: #58a6ff;
-        }
+/* Header */
+.header {
+    max-width: 900px;
+    margin: auto;
+    margin-bottom: 40px;
+}
 
-        h2 {
-            color: #58a6ff;
-            margin-bottom: 10px;
-        }
+h1 {
+    color: #58a6ff;
+    margin-bottom: 5px;
+}
 
-        .stig {
-            margin-bottom: 20px;
-            padding: 14px;
-            border: 1px solid #30363d;
-            border-radius: 10px;
-            background-color: #161b22;
-        }
+.subtitle {
+    color: #8b949e;
+}
 
-        pre {
-            margin: 0;
-            padding: 8 px 10px;
-            font-size: 12px;
-            background: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            overflow-x: auto;
-            white-space: pre-wrap;
-        }
+/* Card */
+.card {
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 18px;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    background: #161b22;
+    transition: 0.2s ease;
+}
 
-        .code-block {
-            position: relative;
-            margin-top: 6px;
-        }
+.card:hover {
+    border-color: #58a6ff;
+    box-shadow: 0 0 10px rgba(88,166,255,0.1);
+}
 
-        .code-block button {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: #238636;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-        }
+/* Title */
+.card h2 {
+    margin: 0 0 6px;
+    color: #58a6ff;
+    font-size: 18px;
+}
 
-        .code-block button:hover {
-            background: #2ea043;
-        }
+.card p {
+    color: #c9d1d9;
+    font-size: 14px;
+}
 
-        p {
-            color: #c9d1d9;
-        }
-    </style>
+/* Expandable */
+details {
+    margin-top: 10px;
+}
+
+summary {
+    cursor: pointer;
+    font-size: 13px;
+    color: #8b949e;
+    margin-bottom: 8px;
+}
+
+summary:hover {
+    color: #58a6ff;
+}
+
+/* Code block */
+.code-container {
+    position: relative;
+}
+
+pre {
+    margin: 0;
+    padding: 12px;
+    font-size: 11px;
+    line-height: 1.4;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    overflow-x: auto;
+    max-height: 250px;
+}
+
+/* Copy button */
+.copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #238636;
+    border: none;
+    color: white;
+    padding: 5px 10px;
+    font-size: 11px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.copy-btn:hover {
+    background: #2ea043;
+}
+</style>
 </head>
 
 <body>
 
-<h1>PowerShell STIG Implementations</h1>
-<p>Collection of STIG remediation scripts used for Windows hardening and cybersecurity compliance automation.</p>
+<div class="header">
+    <h1>PowerShell STIG Implementations</h1>
+    <p class="subtitle">
+        Windows hardening scripts for STIG compliance and security automation.
+    </p>
+</div>
 
-<!-- ===================== STIG 1 ===================== -->
-<div class="stig">
-<h2>STIG WN11-CC-000305</h2>
-<p>Indexing of encrypted files must be turned off.</p>
+<!-- Example Card -->
+<div class="card">
+    <h2>WN11-CC-000305</h2>
+    <p>Disable indexing of encrypted files to prevent data exposure.</p>
 
-<div class="code-block">
-<button onclick="copyCode(this)">Copy</button>
-<pre><#
-.SYNOPSIS
-    Remediates STIG WN11-CC-000305 - Disable indexing of encrypted files
+    <details>
+        <summary>View Script</summary>
 
-.DESCRIPTION
-    Disables Windows Search indexing of encrypted files by setting the
-    appropriate Group Policy registry value.
+        <div class="code-container">
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
 
-.NOTES
-    Run as Administrator
-#>
-
-Write-Host "Applying STIG WN11-CC-000305 remediation..." -ForegroundColor Cyan
-
-# Registry path for Windows Search policy
+<pre>
+# Disable indexing of encrypted files
 $Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search"
 
-# Create key if it doesn't exist
 if (-not (Test-Path $Path)) {
     New-Item -Path $Path -Force | Out-Null
 }
 
-# Disable indexing of encrypted files
 New-ItemProperty -Path $Path `
     -Name "AllowIndexingEncryptedStoresOrItems" `
     -PropertyType DWord `
     -Value 0 `
     -Force | Out-Null
-
-# Restart Windows Search service to apply change
-Write-Host "Restarting Windows Search service..." -ForegroundColor Yellow
-Restart-Service -Name "WSearch" -Force -ErrorAction SilentlyContinue
-
-# Validation
-$result = Get-ItemProperty -Path $Path -Name "AllowIndexingEncryptedStoresOrItems" -ErrorAction SilentlyContinue
-
-if ($result.AllowIndexingEncryptedStoresOrItems -eq 0) {
-    Write-Host "STIG WN11-CC-000305 successfully remediated." -ForegroundColor Green
-} else {
-    Write-Host "STIG remediation FAILED." -ForegroundColor Red
-}
 </pre>
+
+        </div>
+    </details>
 </div>
 
-<p>Indexing of encrypted files may expose sensitive data. This setting prevents encrypted files from being indexed.</p>
-</div>
+<!-- Duplicate this block for other STIGs -->
+<div class="card">
+    <h2>WN11-00-000160</h2>
+    <p>Disable SMBv1 (legacy insecure protocol).</p>
 
-<!-- ===================== STIG 2 ===================== -->
-<div class="stig">
-<h2>STIG WN11-CC-000252</h2>
-<p>Windows 11 must be configured to disable Windows Game Recording and Broadcasting.</p>
+    <details>
+        <summary>View Script</summary>
 
-<div class="code-block">
-<button onclick="copyCode(this)">Copy</button>
-<pre><#
-.SYNOPSIS
-    Remediates STIG WN11-CC-000252 - Disable Windows Game Recording and Broadcasting
+        <div class="code-container">
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
 
-.DESCRIPTION
-    Disables Xbox Game Bar background recording and game DVR features.
-    Required for Windows 11 STIG compliance.
-
-.NOTES
-    Run as Administrator
-#>
-
-Write-Host "Applying STIG WN11-CC-000252 remediation..." -ForegroundColor Cyan
-
-# Registry path for Game DVR / recording features
-$Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR"
-
-# Create key if it doesn't exist
-if (-not (Test-Path $Path)) {
-    New-Item -Path $Path -Force | Out-Null
-}
-
-# Disable Game DVR (recording/broadcasting)
-New-ItemProperty -Path $Path `
-    -Name "AllowGameDVR" `
-    -PropertyType DWord `
-    -Value 0 `
-    -Force | Out-Null
-
-# ALSO disable Xbox Game Bar background capture (user context policy)
-$UserPath = "HKCU:\System\GameConfigStore"
-
-if (-not (Test-Path $UserPath)) {
-    New-Item -Path $UserPath -Force | Out-Null
-}
-
-New-ItemProperty -Path $UserPath `
-    -Name "GameDVR_Enabled" `
-    -PropertyType DWord `
-    -Value 0 `
-    -Force | Out-Null
-
-# Validation
-$check1 = Get-ItemProperty -Path $Path -Name "AllowGameDVR" -ErrorAction SilentlyContinue
-$check2 = Get-ItemProperty -Path $UserPath -Name "GameDVR_Enabled" -ErrorAction SilentlyContinue
-
-if ($check1.AllowGameDVR -eq 0 -and $check2.GameDVR_Enabled -eq 0) {
-    Write-Host "STIG WN11-CC-000252 successfully remediated." -ForegroundColor Green
-} else {
-    Write-Host "STIG remediation FAILED or incomplete." -ForegroundColor Red
-}
-</pre>
-</div>
-
-<p>Windows Game Recording and Broadcasting is intended for use with games; however, it could potentially record screen shots of other applications and expose sensitive data. Disabling the feature will prevent this from occurring</p>
-</div>
-
-<!-- ===================== STIG 3 ===================== -->
-<div class="stig">
-<h2>STIG WN11-CC-000326</h2>
-<p>PowerShell script block logging must be enabled on Windows 11.</p>
-
-<div class="code-block">
-<button onclick="copyCode(this)">Copy</button>
 <pre>
-<#
-.SYNOPSIS
-    Remediates STIG WN11-CC-000326 - Enable PowerShell Script Block Logging
+Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart
 
-.DESCRIPTION
-    Enables PowerShell Script Block Logging to ensure full visibility
-    of executed PowerShell commands for auditing and security monitoring.
-
-.NOTES
-    Run as Administrator
-#>
-
-Write-Host "Applying STIG WN11-CC-000326 remediation..." -ForegroundColor Cyan
-
-# Registry path for PowerShell Script Block Logging
-$Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging"
-
-# Create key if it doesn't exist
-if (-not (Test-Path $Path)) {
-    New-Item -Path $Path -Force | Out-Null
-}
-
-# Enable Script Block Logging
-New-ItemProperty -Path $Path `
-    -Name "EnableScriptBlockLogging" `
-    -PropertyType DWord `
-    -Value 1 `
-    -Force | Out-Null
-
-# Optional but recommended: enable module logging as well (good for SIEM correlation)
-$ModulePath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging"
-if (-not (Test-Path $ModulePath)) {
-    New-Item -Path $ModulePath -Force | Out-Null
-}
-
-New-ItemProperty -Path $ModulePath `
-    -Name "EnableModuleLogging" `
-    -PropertyType DWord `
-    -Value 1 `
-    -Force | Out-Null
-
-# Ensure module logging includes all modules
-$ModuleSettingsPath = "$ModulePath\ModuleNames"
-if (-not (Test-Path $ModuleSettingsPath)) {
-    New-Item -Path $ModuleSettingsPath -Force | Out-Null
-}
-
-New-ItemProperty -Path $ModuleSettingsPath `
-    -Name "*" `
-    -PropertyType String `
-    -Value "*" `
-    -Force | Out-Null
-
-# Validation
-$check = Get-ItemProperty -Path $Path -Name "EnableScriptBlockLogging" -ErrorAction SilentlyContinue
-
-if ($check.EnableScriptBlockLogging -eq 1) {
-    Write-Host "STIG WN11-CC-000326 successfully remediated." -ForegroundColor Green
-} else {
-    Write-Host "STIG remediation FAILED." -ForegroundColor Red
-}
-
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" `
+    -Name SMB1 -Value 0 -Type DWord
 </pre>
+
+        </div>
+    </details>
 </div>
 
-<p>Maintaining an audit trail of system activity logs can help identify configuration errors, troubleshoot service disruptions, and analyze compromises that have occurred, as well as detect attacks. Audit logs are necessary to provide a trail of evidence in case the system or network is compromised. Collecting this data is essential for analyzing the security of information assets and detecting signs of suspicious and unexpected behavior.
-
-Enabling PowerShell script block logging will record detailed information from the processing of PowerShell commands and scripts. This can provide additional detail when malware has run on a system.</p>
-</div>
-
-<!-- ===================== STIG 4 ===================== -->
-<div class="stig">
-<h2>STIG WN11-00-000160</h2>
-<p>Disables SMBv1 protocol.</p>
-
-<div class="code-block">
-<button onclick="copyCode(this)">Copy</button>
-<pre><#
-.SYNOPSIS
-    Remediates STIG WN11-00-000160 by disabling SMBv1 on Windows 11 systems.
-
-.DESCRIPTION
-    The Server Message Block (SMB) v1 protocol is an outdated and insecure protocol.
-    This script disables SMBv1 via Windows Optional Features and registry configuration.
-
-.NOTES
-    Date: 2026-05-03
-    STIG ID: WN11-00-000160
-#>
-
-Write-Host "Checking SMBv1 status..." -ForegroundColor Cyan
-
-# Disable SMBv1 via Windows Optional Feature (client component)
-Try {
-    Disable-WindowsOptionalFeature -Online -FeatureName "SMB1Protocol" -NoRestart -ErrorAction Stop
-    Write-Host "SMBv1 Windows Feature disabled successfully." -ForegroundColor Green
-}
-Catch {
-    Write-Host "SMBv1 feature may already be disabled or not present." -ForegroundColor Yellow
-}
-
-# Disable SMBv1 via registry (additional enforcement)
-$registryPath = "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters"
-
-If (!(Test-Path $registryPath)) {
-    New-Item -Path $registryPath -Force | Out-Null
-}
-
-New-ItemProperty -Path $registryPath -Name "SMB1" -PropertyType DWORD -Value 0 -Force | Out-Null
-
-Write-Host "Registry settings applied to disable SMBv1." -ForegroundColor Green
-
-# Verify SMBv1 is disabled
-Write-Host "`nVerifying SMBv1 state..." -ForegroundColor Cyan
-Get-WindowsOptionalFeature -Online -FeatureName "SMB1Protocol"
-
-Write-Host "`nRemediation complete. A reboot may be required for full effect." -ForegroundColor Green
-</pre>
-</div>
-
-<p>SMBv1 is a legacy protocol that uses the MD5 algorithm as part of SMB. MD5 is known to be vulnerable to a number of attacks such as collision and preimage attacks as well as not being FIPS compliant.
-
-Disabling SMBv1 support may prevent access to file or print sharing resources with systems or devices that only support SMBv1. File shares and print services hosted on Windows Server 2003 are an example, however Windows Server 2003 is no longer a supported operating system. Some older Network Attached Storage (NAS) devices may only support SMBv1</p>
-</div>
-
-<!-- ===================== STIG 5 ===================== -->
-<div class="stig">
-<h2>STIG WN11-CC-000315</h2>
-<p>Windows Installer must not always install with elevated privileges</p>
-
-<div class="code-block">
-<button onclick="copyCode(this)">Copy</button>
-<pre>
-<#
-.SYNOPSIS
-    Remediates STIG WN11-CC-000315
-    Windows Installer must not always install with elevated privileges
-
-.DESCRIPTION
-    The Windows Installer "AlwaysInstallElevated" policy allows non-admin users
-    to install software with SYSTEM-level privileges. This is a CAT I (High)
-    finding and must be disabled in both HKLM and HKCU hives.
-
-.STIG
-    ID:       WN11-CC-000315
-    Severity: CAT I (High)
-    Fix:      Set AlwaysInstallElevated to 0 in both registry hives
-
-.NOTES
-    Must be run as Administrator
-#>
-
-# ─────────────────────────────────────────
-# Requires Administrator
-# ─────────────────────────────────────────
-If (-NOT ([Security.Principal.WindowsPrincipal] `
-    [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
-    [Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Warning "This script must be run as Administrator. Exiting."
-    Exit 1
-}
-
-# ─────────────────────────────────────────
-# Registry Paths
-# ─────────────────────────────────────────
-$HKLMPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Installer"
-$HKCUPath = "HKCU:\SOFTWARE\Policies\Microsoft\Windows\Installer"
-$ValueName = "AlwaysInstallElevated"
-$RequiredValue = 0
-
-# ─────────────────────────────────────────
-# Function: Check Current Value
-# ─────────────────────────────────────────
-Function Get-STIGStatus {
-    param ($Path, $Name)
-
-    If (Test-Path $Path) {
-        $val = Get-ItemProperty -Path $Path -Name $Name -ErrorAction SilentlyContinue
-        If ($null -ne $val.$Name) {
-            Return $val.$Name
-        }
-    }
-    Return "Not Set"
-}
-
-# ─────────────────────────────────────────
-# Check Before Remediation
-# ─────────────────────────────────────────
-Write-Host "`n[*] Checking current state before remediation..." -ForegroundColor Cyan
-
-$HKLMBefore = Get-STIGStatus -Path $HKLMPath -Name $ValueName
-$HKCUBefore = Get-STIGStatus -Path $HKCUPath -Name $ValueName
-
-Write-Host "  HKLM AlwaysInstallElevated : $HKLMBefore"
-Write-Host "  HKCU AlwaysInstallElevated : $HKCUBefore"
-
-# ─────────────────────────────────────────
-# Remediate HKLM
-# ─────────────────────────────────────────
-Write-Host "`n[*] Remediating HKLM..." -ForegroundColor Yellow
-
-Try {
-    If (-Not (Test-Path $HKLMPath)) {
-        New-Item -Path $HKLMPath -Force | Out-Null
-        Write-Host "  [+] Created registry path: $HKLMPath"
-    }
-    Set-ItemProperty -Path $HKLMPath -Name $ValueName -Value $RequiredValue -Type DWord -Force
-    Write-Host "  [+] HKLM\$ValueName set to $RequiredValue" -ForegroundColor Green
-} Catch {
-    Write-Error "  [-] Failed to remediate HKLM: $_"
-}
-
-# ─────────────────────────────────────────
-# Remediate HKCU
-# ─────────────────────────────────────────
-Write-Host "`n[*] Remediating HKCU..." -ForegroundColor Yellow
-
-Try {
-    If (-Not (Test-Path $HKCUPath)) {
-        New-Item -Path $HKCUPath -Force | Out-Null
-        Write-Host "  [+] Created registry path: $HKCUPath"
-    }
-    Set-ItemProperty -Path $HKCUPath -Name $ValueName -Value $RequiredValue -Type DWord -Force
-    Write-Host "  [+] HKCU\$ValueName set to $RequiredValue" -ForegroundColor Green
-} Catch {
-    Write-Error "  [-] Failed to remediate HKCU: $_"
-}
-
-# ─────────────────────────────────────────
-# Verify After Remediation
-# ─────────────────────────────────────────
-Write-Host "`n[*] Verifying remediation..." -ForegroundColor Cyan
-
-$HKLMAfter = Get-STIGStatus -Path $HKLMPath -Name $ValueName
-$HKCUAfter = Get-STIGStatus -Path $HKCUPath -Name $ValueName
-
-Write-Host "  HKLM AlwaysInstallElevated : $HKLMAfter"
-Write-Host "  HKCU AlwaysInstallElevated : $HKCUAfter"
-
-# ─────────────────────────────────────────
-# Pass/Fail Result
-# ─────────────────────────────────────────
-Write-Host ""
-If ($HKLMAfter -eq $RequiredValue -and $HKCUAfter -eq $RequiredValue) {
-    Write-Host "  [PASS] WN11-CC-000315 remediation successful." -ForegroundColor Green
-} Else {
-    Write-Host "  [FAIL] WN11-CC-000315 remediation may not be complete. Review values above." -ForegroundColor Red
-}
-
-Write-Host "`n[*] Done. Run 'gpupdate /force' to apply Group Policy changes.`n" -ForegroundColor Cyan
-
-</pre>
-</div>
-
-<p>Prevents silent privilege escalation.</p>
-</div>
-
-<!-- ===================== STIG 6 ===================== -->
-<div class="stig">
-<h2>STIG WN11-CC-000345</h2>
-<p>The Windows Remote Management (WinRM) service must not use Basic authentication.</p>
-
-<div class="code-block">
-<button onclick="copyCode(this)">Copy</button>
-<pre><#
-.SYNOPSIS
-    Remediates STIG by disabling Basic Authentication for WinRM.
-
-.DESCRIPTION
-    The Windows Remote Management (WinRM) service must not use Basic authentication.
-    This script disables Basic authentication for both WinRM Service and Client
-    via registry policy settings and WinRM configuration.
-
-.NOTES
-    Date: 2026-05-03
-#>
-
-Write-Host "Disabling WinRM Basic Authentication..." -ForegroundColor Cyan
-
-# -----------------------------
-# Disable via Group Policy Registry (Service)
-# -----------------------------
-$serviceRegPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WinRM\Service"
-
-If (!(Test-Path $serviceRegPath)) {
-    New-Item -Path $serviceRegPath -Force | Out-Null
-}
-
-New-ItemProperty -Path $serviceRegPath `
-    -Name "AllowBasic" `
-    -PropertyType DWord `
-    -Value 0 `
-    -Force | Out-Null
-
-Write-Host "WinRM Service Basic Authentication disabled via policy." -ForegroundColor Green
-
-# -----------------------------
-# Disable via Group Policy Registry (Client)
-# -----------------------------
-$clientRegPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WinRM\Client"
-
-If (!(Test-Path $clientRegPath)) {
-    New-Item -Path $clientRegPath -Force | Out-Null
-}
-
-New-ItemProperty -Path $clientRegPath `
-    -Name "AllowBasic" `
-    -PropertyType DWord `
-    -Value 0 `
-    -Force | Out-Null
-
-Write-Host "WinRM Client Basic Authentication disabled via policy." -ForegroundColor Green
-
-# -----------------------------
-# Disable via WinRM configuration layer
-# -----------------------------
-Try {
-    winrm set winrm/config/service/auth "@{Basic=`"false`"}" | Out-Null
-    winrm set winrm/config/client/auth "@{Basic=`"false`"}" | Out-Null
-    Write-Host "WinRM service and client auth updated successfully." -ForegroundColor Green
-}
-Catch {
-    Write-Host "WinRM configuration update failed or already enforced by policy." -ForegroundColor Yellow
-}
-
-# -----------------------------
-# Verification
-# -----------------------------
-Write-Host "`nCurrent WinRM Service Auth Settings:" -ForegroundColor Cyan
-winrm get winrm/config/service/auth
-
-Write-Host "`nCurrent WinRM Client Auth Settings:" -ForegroundColor Cyan
-winrm get winrm/config/client/auth
-
-Write-Host "`nRemediation complete. A restart of WinRM service may be required." -ForegroundColor Green
-</pre>
-</div>
-
-<p>Basic authentication uses plain text passwords that could be used to compromise a system.</p>
-</div>
-
-<!-- ===================== STIG 7 ===================== -->
-<div class="stig">
-<h2>STIG WN11-AC-000010</h2>
-<p>The account lockout threshold must be
-    configured to 3 or fewer invalid logon attempts.
-</p>
-
-<div class="code-block">
-<button onclick="copyCode(this)">Copy</button>
-<pre><#
-.SYNOPSIS
-    Remediates STIG WN11-AC-000010 - The account lockout threshold must be
-    configured to 3 or fewer invalid logon attempts.
-
-.DESCRIPTION
-    STIG ID   : WN11-AC-000010
-    Severity  : CAT II (Medium)
-    CCI       : CCI-000044
-    Rule ID   : SV-253298r958388_rule
-    Vuln ID   : V-253298
-
-    Finding:
-        The account lockout feature prevents brute-force password attacks by
-        locking an account after a defined number of consecutive failed logon
-        attempts. A threshold of 0 disables lockout entirely, and a value
-        greater than 3 makes the protection too weak. The required value is
-        between 1 and 3 (inclusive).
-
-    Required setting:
-        Policy  : Account lockout threshold
-        Value   : 3 or fewer invalid logon attempts (1–3)
-        Tool    : Local Security Policy (secedit) / net accounts
-
-    Group Policy equivalent:
-        Computer Configuration >> Windows Settings >> Security Settings >>
-        Account Policies >> Account Lockout Policy >>
-        "Account lockout threshold" = 3 or fewer
-
-.NOTES
-    - Must be run as Administrator (elevated PowerShell).
-    - This script uses 'net accounts' to read the current threshold and
-      'secedit' to apply the policy — the same mechanism as Local Group Policy.
-    - On domain-joined systems, the domain Account Lockout Policy will override
-      local policy. Verify the domain GPO is also compliant.
-    - No reboot is required; the change is effective immediately.
-    - The script sets the threshold to 3 (the maximum compliant value). Adjust
-      $RequiredThreshold below if your organisation mandates a stricter value.
-
-.EXAMPLE
-    .\Remediate-WN11-AC-000010.ps1
-
-.EXAMPLE
-    # To enforce a stricter threshold of 2:
-    # Edit the line below:  $RequiredThreshold = 2
-#>
-
-#Requires -RunAsAdministrator
-
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
-
-# ── Configuration ─────────────────────────────────────────────────────────────
-$StigId            = 'WN11-AC-000010'
-$RequiredThreshold = 3        # STIG maximum; set lower for stricter posture (1–3)
-$MinThreshold      = 1        # Must not be 0 (that disables lockout)
-
-# ── Helper: write a timestamped, coloured status line ─────────────────────────
-function Write-Status {
-    param(
-        [string]$Message,
-        [ValidateSet('Info','Pass','Fail','Action','Warn')]
-        [string]$Level = 'Info'
-    )
-    $colour = switch ($Level) {
-        'Pass'   { 'Green'  }
-        'Fail'   { 'Red'    }
-        'Action' { 'Cyan'   }
-        'Warn'   { 'Yellow' }
-        default  { 'White'  }
-    }
-    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
-}
-
-# ── Helper: get the current lockout threshold via 'net accounts' ──────────────
-function Get-LockoutThreshold {
-    $output    = net accounts 2>&1
-    $line      = $output | Where-Object { $_ -match 'Lockout threshold' }
-    if ($line -match ':\s*(\S+)') {
-        $raw = $Matches[1].Trim()
-        # 'Never' means 0 (disabled)
-        if ($raw -ieq 'Never') { return 0 }
-        if ($raw -match '^\d+$') { return [int]$raw }
-    }
-    return $null
-}
-
-# ── Helper: apply the threshold via secedit ───────────────────────────────────
-function Set-LockoutThreshold {
-    param([int]$Threshold)
-
-    $tmpDir  = $env:TEMP
-    $cfgFile = Join-Path $tmpDir 'stig_ac000010.inf'
-    $dbFile  = Join-Path $tmpDir 'stig_ac000010.sdb'
-    $logFile = Join-Path $tmpDir 'stig_ac000010.log'
-
-    # Build a minimal Security Template (.inf) for secedit
-    $infContent = @"
-[Unicode]
-Unicode=yes
-[System Access]
-LockoutBadCount = $Threshold
-[Version]
-signature="`$CHICAGO`$"
-Revision=1
-"@
-
-    Set-Content -Path $cfgFile -Value $infContent -Encoding Unicode
-
-    Write-Status "Applying policy via secedit (threshold = $Threshold)..." Action
-
-    $result = secedit /configure /db $dbFile /cfg $cfgFile /log $logFile /quiet 2>&1
-
-    # Clean up temp files
-    Remove-Item $cfgFile, $dbFile, $logFile -ErrorAction SilentlyContinue
-
-    return $result
-}
-
-# ── Main ──────────────────────────────────────────────────────────────────────
-Write-Status "Starting remediation for $StigId" Info
-Write-Status "Control: Account lockout threshold must be 1–$RequiredThreshold invalid logon attempts" Info
-Write-Host   ""
-
-# ── Pre-check ─────────────────────────────────────────────────────────────────
-Write-Status "PRE-CHECK" Info
-$currentThreshold = Get-LockoutThreshold
-
-if ($null -eq $currentThreshold) {
-    Write-Status "Could not determine current lockout threshold. Proceeding with remediation." Warn
-} elseif ($currentThreshold -eq 0) {
-    Write-Status "Account lockout threshold = 0 (DISABLED) -- FINDING" Fail
-} elseif ($currentThreshold -gt $RequiredThreshold) {
-    Write-Status "Account lockout threshold = $currentThreshold (exceeds maximum of $RequiredThreshold) -- FINDING" Fail
-} else {
-    Write-Status "Account lockout threshold = $currentThreshold (within compliant range 1–$RequiredThreshold) -- ALREADY COMPLIANT" Pass
-    Write-Host   ""
-    Write-Status "No changes required. Exiting." Info
-    exit 0
-}
-
-Write-Host ""
-
-# ── Remediation ───────────────────────────────────────────────────────────────
-Write-Status "REMEDIATION" Action
-Write-Status "Setting account lockout threshold to $RequiredThreshold via secedit..." Action
-
-try {
-    Set-LockoutThreshold -Threshold $RequiredThreshold
-    Write-Status "secedit completed successfully." Action
-}
-catch {
-    Write-Status "secedit failed: $_" Fail
-    exit 1
-}
-
-Write-Host ""
-
-# ── Post-check / Verification ─────────────────────────────────────────────────
-Write-Status "POST-CHECK / VERIFICATION" Info
-
-# Allow a moment for the policy engine to apply the change
-Start-Sleep -Seconds 2
-
-$verifyThreshold = Get-LockoutThreshold
-
-if ($null -eq $verifyThreshold) {
-    Write-Status "VERIFICATION WARNING: Could not read threshold after remediation. Confirm manually via 'net accounts'." Warn
-} elseif ($verifyThreshold -eq 0 -or $verifyThreshold -gt $RequiredThreshold) {
-    Write-Status "VERIFICATION FAILED: Threshold = $verifyThreshold (non-compliant). Check for overriding domain GPO." Fail
-    Write-Status "Run 'gpresult /r' to check which GPO is controlling this setting." Warn
-    exit 1
-} else {
-    Write-Status "VERIFICATION PASSED: Account lockout threshold = $verifyThreshold -- COMPLIANT" Pass
-}
-
-Write-Host ""
-
-# ── Summary ───────────────────────────────────────────────────────────────────
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Status "Remediation Summary" Info
-Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
-Write-Host   "  Setting   : Account lockout threshold" -ForegroundColor White
-Write-Host   "  Value Set : $RequiredThreshold invalid logon attempts" -ForegroundColor White
-Write-Host   "  Method    : secedit (Local Security Policy)" -ForegroundColor White
-Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Host ""
-Write-Status "NOTE: On domain-joined systems, verify the domain GPO also enforces" Warn
-Write-Status "      this setting. Local policy may be overridden at the next gpupdate." Warn
-Write-Host   "      Location: Computer Configuration >> Windows Settings >> Security Settings >>" -ForegroundColor Yellow
-Write-Host   "      Account Policies >> Account Lockout Policy >>" -ForegroundColor Yellow
-Write-Host   "      'Account lockout threshold' = $RequiredThreshold or fewer" -ForegroundColor Yellow
-Write-Host ""
-Write-Status "You can also verify with: net accounts | findstr /i 'lockout'" Warn
-Write-Host ""
-Write-Status "Remediation complete." Pass
-
-</pre>
-</div>
-
-<p>The account lockout feature, when enabled, prevents brute-force password attacks on the system. The higher this value is, the less effective the account lockout feature will be in protecting the local system. The number of bad logon attempts must be reasonably small to minimize the possibility of a successful password attack, while allowing for honest errors made during a normal user logon.</p>
-</div>
-
-<!-- ===================== STIG 8 ===================== -->
-<div class="stig">
-<h2>STIG WN11-CC-000280</h2>
-<p>Remote Desktop Services must always prompt a client for passwords upon connection.</p>
-
-<div class="code-block">
-<button onclick="copyCode(this)">Copy</button>
-<pre><#
-.SYNOPSIS
-    Remediates STIG WN11-CC-000280 by requiring password prompt for RDP connections.
-
-.DESCRIPTION
-    This setting ensures that Remote Desktop Services always prompts the user
-    for a password upon connection, preventing credential caching and reuse.
-
-    Configures:
-    Computer Configuration > Administrative Templates >
-    Windows Components > Remote Desktop Services >
-    Remote Desktop Session Host > Security >
-    "Always prompt for password upon connection" = Enabled
-
-.NOTES
-    Date: 2026-05-03
-    STIG ID: WN11-CC-000280
-#>
-
-Write-Host "Configuring RDP to always prompt for password..." -ForegroundColor Cyan
-
-# Registry path for the policy
-$regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"
-
-# Ensure path exists
-If (!(Test-Path $regPath)) {
-    New-Item -Path $regPath -Force | Out-Null
-}
-
-# Enable "Always prompt for password upon connection"
-New-ItemProperty -Path $regPath `
-    -Name "fPromptForPassword" `
-    -PropertyType DWord `
-    -Value 1 `
-    -Force | Out-Null
-
-Write-Host "Policy applied: Always prompt for password enabled." -ForegroundColor Green
-
-# -----------------------------
-# Verification
-# -----------------------------
-Write-Host "`nVerifying configuration..." -ForegroundColor Cyan
-
-$value = Get-ItemProperty -Path $regPath -Name "fPromptForPassword" -ErrorAction SilentlyContinue
-
-If ($value.fPromptForPassword -eq 1) {
-    Write-Host "Verification successful: System is compliant." -ForegroundColor Green
-} else {
-    Write-Host "Verification failed: Setting is not correctly applied." -ForegroundColor Red
-}
-
-Write-Host "`nRemediation complete. A reboot or gpupdate may be required." -ForegroundColor Green
-</pre>
-</div>
-
-<p>This setting controls the ability of users to supply passwords automatically as part of their remote desktop connection. Disabling this setting would allow anyone to use the stored credentials in a connection item to connect to the terminal server.</p>
-</div>
-
-<!-- ===================== STIG 9 ===================== -->
-<div class="stig">
-<h2>STIG WN11-CC-000005</h2>
-<p>Camera access from the lock screen must be disabled.</p>
-
-<div class="code-block">
-<button onclick="copyCode(this)">Copy</button>
-<pre><#
-.SYNOPSIS
-    Remediates STIG WN11-CC-000005 - Camera access from the lock screen must be disabled.
-
-.DESCRIPTION
-    STIG ID   : WN11-CC-000005
-    Severity  : CAT II (Medium)
-    CCI       : CCI-000366
-    Rule ID   : SV-253336r958502_rule
-    Vuln ID   : V-253336
-
-    Finding:
-        Allowing camera access from the lock screen could allow unauthorized
-        users to capture images or video without authenticating to the system.
-
-    Required setting:
-        Policy  : Allow use of camera from lock screen
-        Value   : Disabled
-        Registry: HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization
-                  NoLockScreenCamera = 1 (DWORD)
-
-    Group Policy equivalent:
-        Computer Configuration >> Administrative Templates >>
-        Control Panel >> Personalization >>
-        "Prevent enabling lock screen camera" = Enabled
-
-.NOTES
-    - Must be run as Administrator (elevated PowerShell).
-    - Policy is enforced via registry (policy-backed).
-    - On domain-joined systems, domain GPO may override this setting.
-    - No reboot required; may require gpupdate.
-
-.EXAMPLE
-    .\Remediate-WN11-CC-000005.ps1
-#>
-
-#Requires -RunAsAdministrator
-
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
-
-# ── Configuration ─────────────────────────────────────────────────────────────
-$StigId      = 'WN11-CC-000005'
-$RegPath     = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization'
-$ValueName   = 'NoLockScreenCamera'
-$RequiredVal = 1
-
-# ── Helper: write a timestamped, coloured status line ─────────────────────────
-function Write-Status {
-    param(
-        [string]$Message,
-        [ValidateSet('Info','Pass','Fail','Action','Warn')]
-        [string]$Level = 'Info'
-    )
-    $colour = switch ($Level) {
-        'Pass'   { 'Green'  }
-        'Fail'   { 'Red'    }
-        'Action' { 'Cyan'   }
-        'Warn'   { 'Yellow' }
-        default  { 'White'  }
-    }
-    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Write-Host "[$ts] [$StigId] [$Level] $Message" -ForegroundColor $colour
-}
-
-# ── Helper: get current value ─────────────────────────────────────────────────
-function Get-PolicyValue {
-    if (Test-Path $RegPath) {
-        try {
-            return (Get-ItemProperty -Path $RegPath -Name $ValueName -ErrorAction Stop).$ValueName
-        }
-        catch {
-            return $null
-        }
-    }
-    return $null
-}
-
-# ── Helper: set value ─────────────────────────────────────────────────────────
-function Set-PolicyValue {
-    Write-Status "Applying registry setting..." Action
-
-    if (-not (Test-Path $RegPath)) {
-        Write-Status "Registry path does not exist. Creating..." Action
-        New-Item -Path $RegPath -Force | Out-Null
-    }
-
-    New-ItemProperty -Path $RegPath -Name $ValueName -Value $RequiredVal -PropertyType DWord -Force | Out-Null
-}
-
-# ── Main ──────────────────────────────────────────────────────────────────────
-Write-Status "Starting remediation for $StigId" Info
-Write-Status "Control: Camera access from lock screen must be disabled" Info
-Write-Host   ""
-
-# ── Pre-check ─────────────────────────────────────────────────────────────────
-Write-Status "PRE-CHECK" Info
-
-$currentValue = Get-PolicyValue
-
-if ($null -eq $currentValue) {
-    Write-Status "Registry value not set -- FINDING" Fail
-}
-elseif ($currentValue -ne $RequiredVal) {
-    Write-Status "Registry value = $currentValue (expected $RequiredVal) -- FINDING" Fail
-}
-else {
-    Write-Status "Registry value = $currentValue -- ALREADY COMPLIANT" Pass
-    Write-Host ""
-    Write-Status "No changes required. Exiting." Info
-    exit 0
-}
-
-Write-Host ""
-
-# ── Remediation ───────────────────────────────────────────────────────────────
-Write-Status "REMEDIATION" Action
-
-try {
-    Set-PolicyValue
-    Write-Status "Registry successfully updated." Action
-}
-catch {
-    Write-Status "Failed to apply registry setting: $_" Fail
-    exit 1
-}
-
-Write-Host ""
-
-# ── Post-check / Verification ─────────────────────────────────────────────────
-Write-Status "POST-CHECK / VERIFICATION" Info
-
-Start-Sleep -Seconds 2
-
-$verifyValue = Get-PolicyValue
-
-if ($verifyValue -eq $RequiredVal) {
-    Write-Status "VERIFICATION PASSED: Registry value = $verifyValue -- COMPLIANT" Pass
-}
-else {
-    Write-Status "VERIFICATION FAILED: Registry value = $verifyValue (expected $RequiredVal)" Fail
-    exit 1
-}
-
-Write-Host ""
-
-# ── Summary ───────────────────────────────────────────────────────────────────
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Status "Remediation Summary" Info
-Write-Host   "  STIG ID   : $StigId" -ForegroundColor White
-Write-Host   "  Setting   : Lock screen camera access" -ForegroundColor White
-Write-Host   "  Value Set : Disabled (NoLockScreenCamera = 1)" -ForegroundColor White
-Write-Host   "  Method    : Registry (Policy-based)" -ForegroundColor White
-Write-Host   "  Status    : COMPLIANT" -ForegroundColor Green
-Write-Host "─────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Host ""
-
-Write-Status "NOTE: Domain GPO may override this setting." Warn
-Write-Status "      Verify in Group Policy if system is domain-joined." Warn
-Write-Host   "      Location: Computer Configuration >> Administrative Templates >>" -ForegroundColor Yellow
-Write-Host   "      Control Panel >> Personalization >>" -ForegroundColor Yellow
-Write-Host   "      'Prevent enabling lock screen camera' = Enabled" -ForegroundColor Yellow
-Write-Host ""
-
-Write-Status "You can also verify with:" Warn
-Write-Host   "      Get-ItemProperty -Path '$RegPath' -Name '$ValueName'" -ForegroundColor Yellow
-Write-Host ""
-
-Write-Status "Remediation complete." Pass
-</pre>
-</div>
-
-<p>Ensures network filtering is enforced on domain networks.</p>
-</div>
-
-<!-- ===================== STIG 10 ===================== -->
-<div class="stig">
-<h2>STIG WN11-CC-000185</h2>
-<p>The default autorun behavior must be configured to prevent autorun commands.</p>
-
-<div class="code-block">
-<button onclick="copyCode(this)">Copy</button>
-<pre>
-<#
-.SYNOPSIS
-    Remediates STIG WN11-CC-000185 - Prevent Autorun commands
-
-.DESCRIPTION
-    Configures the system to prevent Autorun commands from executing
-    on removable and network drives.
-
-.NOTES
-    Run as Administrator
-#>
-
-Write-Host "Applying STIG WN11-CC-000185 remediation..." -ForegroundColor Cyan
-
-# Registry path for Autoplay/Autorun policies
-$Path = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer"
-
-# Create key if missing
-if (-not (Test-Path $Path)) {
-    New-Item -Path $Path -Force | Out-Null
-}
-
-# Disable Autorun for all drive types (0xFF = 255)
-New-ItemProperty -Path $Path `
-    -Name "NoDriveTypeAutoRun" `
-    -PropertyType DWord `
-    -Value 255 `
-    -Force | Out-Null
-
-# Ensure Autorun is fully disabled
-New-ItemProperty -Path $Path `
-    -Name "NoAutorun" `
-    -PropertyType DWord `
-    -Value 1 `
-    -Force | Out-Null
-
-# (Optional but recommended) Turn off Autoplay completely
-$PolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Explorer"
-
-if (-not (Test-Path $PolicyPath)) {
-    New-Item -Path $PolicyPath -Force | Out-Null
-}
-
-New-ItemProperty -Path $PolicyPath `
-    -Name "NoAutoplayfornonVolume" `
-    -PropertyType DWord `
-    -Value 1 `
-    -Force | Out-Null
-
-# Validation
-$result = Get-ItemProperty -Path $Path -Name "NoDriveTypeAutoRun" -ErrorAction SilentlyContinue
-
-if ($result.NoDriveTypeAutoRun -eq 255) {
-    Write-Host "STIG WN11-CC-000185 successfully remediated." -ForegroundColor Green
-} else {
-    Write-Host "STIG remediation FAILED." -ForegroundColor Red
-}
-</pre>
-</div>
-
-<p>Allowing autorun commands to execute may introduce malicious code to a system. Configuring this setting prevents autorun commands from executing.</p>
-</div>
-
-<!-- ===================== SCRIPT ===================== -->
 <script>
 function copyCode(button) {
     const code = button.nextElementSibling.innerText;
 
     navigator.clipboard.writeText(code).then(() => {
         button.innerText = "Copied!";
-        setTimeout(() => {
-            button.innerText = "Copy";
-        }, 1500);
+        setTimeout(() => button.innerText = "Copy", 1500);
     });
 }
 </script>
